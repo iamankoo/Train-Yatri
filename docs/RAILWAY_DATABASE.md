@@ -5,48 +5,129 @@ stations, trains, routes and (where the source provides it) operating
 calendars. This document explains where that data comes from, how the
 database is built, and how the app consumes it.
 
-## Status: infrastructure only, no data yet
+## Status: real dataset acquired and packaged
 
-**This repository does not currently contain a real railway dataset.**
-Everything described below - the schema, the import pipeline, the
-repository, the tests - is real and fully working, but it has never
-been run against actual Indian Railways data, because none has been
-supplied. `assets/database/railway.db` does not exist and is
-deliberately **not** listed in `pubspec.yaml`'s `assets:` section yet -
-adding a path there that doesn't exist would break the Flutter build.
+`assets/database/railway.db` is built from two legitimate, licensed,
+publicly-available sources (full detail below), reproducibly via
+`scripts/acquire_railway_data.dart` + `scripts/transform_railway_data.dart`
++ `bin/import_railway_data.dart`. Nothing in it is invented.
 
-To finish Block 2 for real:
+### Sources
 
-1. Obtain a legitimate railway dataset (see "What's needed" below).
-2. Convert/export it into the four CSV files described under "Input
-   format".
-3. Run `dart run bin/import_railway_data.dart` (see "Building the
-   database") to produce `assets/database/railway.db`.
-4. Add `- assets/database/railway.db` to `pubspec.yaml`'s `assets:`
-   list.
-5. Record the dataset's source/version in this document.
+**1. Train timetable - primary source, for trains/stations/route stops**
 
-Until then, nothing in the running app calls into this code - Home
-screen behavior is unchanged from Block 1 - so there is no broken or
-fake-data user experience in the meantime.
+- **Original publisher:** Ministry of Railways, Government of India, via
+  [data.gov.in](https://www.data.gov.in/catalog/indian-railways-train-time-table)
+  (the Open Government Data Platform India), under the
+  [Government Open Data License - India (GODL)](https://www.data.gov.in/government-open-data-license-india),
+  which permits reuse including commercial use with attribution.
+- **Mirror actually used:** data.gov.in's own catalog page returns HTTP
+  403 to automated fetches and requires interactive/registered browser
+  access, so this project uses the well-known, widely-cited mirror at
+  [github.com/itzmeanjan/indian-railway](https://github.com/itzmeanjan/indian-railway)
+  (`data/Train_details_22122017.csv`, MIT-licensed repository, data
+  explicitly attributed to data.gov.in in its README), retrieved
+  2026-09-02.
+- **Dataset date:** the filename and file content indicate this is a
+  snapshot of the timetable as published **22 December 2017**.
+- **Fields used:** train number, train name, stop sequence, station
+  code, station name, arrival time, departure time, cumulative distance
+  from origin.
 
-### What's needed
+**2. Station geography - supplementary source, for state/coordinates only**
 
-A dataset that provides, at minimum:
+- **Publisher:** [github.com/datameet/railways](https://github.com/datameet/railways),
+  a community-maintained dataset by [Sanjay Bhangar](https://twitter.com/sanjaybhangar)
+  and [Sajjad Anwar](https://twitter.com/geohacker).
+- **License:** [CC0](https://wiki.creativecommons.org/wiki/CC0) (public
+  domain dedication).
+- **Retrieved:** 2026-09-02, from `stations.json` (commit `e0c538a`,
+  2016-08-08).
+- **Fields used:** state, latitude, longitude - added only to a station
+  already present from source 1, matched by normalized station code.
+  Never used to add a station, or to override a code/name from source 1.
 
-- **Stations**: code, name, and ideally city/state/coordinates.
-- **Trains/services**: number, name.
-- **Route stops**: for each train, its ordered stops with arrival/
-  departure times and (for overnight trains) which day of the journey
-  each stop falls on.
-- **Running days** (optional but valuable): which days of the week each
-  train operates. Many open Indian Railways datasets do not source this
-  authoritatively - the schema and domain model represent that
-  explicitly via `DataConfidence` rather than assuming every train runs
-  daily.
+### Known dataset limitations (read before trusting a number)
 
-Whatever source is used, its licensing must permit bundling the derived
-data inside the app.
+- **The data is a 2016-2017 snapshot, not current.** Indian Railways
+  timetables, train numbers and routes change over time; this dataset
+  does not reflect trains introduced, renumbered, or discontinued since
+  then. The app must never present this as live or current information
+  - it is exactly what Block 1's product rules call "static railway
+  knowledge," now with a concrete date attached. Treat `dataset_version`
+  (readable via `getDatasetMetadata()`) as that date, always.
+- **No running-day/weekly-calendar data.** Neither source above
+  provides it, and no other legitimate bulk-downloadable source could
+  be found (the live National Train Enquiry System is a live/interactive
+  lookup, not a bulk dataset, and scraping it per-train would both
+  violate the "no live-status scraping in this block" rule and likely
+  its terms of use). `running_days` is therefore empty for every train.
+  `RailwayRepository.getRunningDays()` correctly returns `null` for all
+  11,112 trains - this is honest absence, not a bug.
+- **8,148 station codes from source 1; only 7,680 (94%) matched a
+  station in source 2** and got state/coordinates. The remaining 468
+  have `city`/`state`/`latitude`/`longitude` all `NULL` - they are still
+  real, valid stations (present in the primary government-derived
+  source), just without geo enrichment.
+- **5 of 186,107 route-stop rows (0.003%) were rejected** - the source
+  literally contains `NA` for arrival/departure/distance at station
+  `KGIH` on 5 specific train entries. Rejected and reported, not
+  silently coerced into a fake time.
+- **1 train number's name conflicted** across rows in the source
+  (`scripts/transform_railway_data.dart` logs every such conflict); the
+  first-seen name was kept deterministically rather than guessed.
+- **`is_active` is not provided by the source** and is left blank,
+  which the import pipeline treats as "active" by convention (see
+  `docs/RAILWAY_DATABASE.md#input-format` below) - this reflects "was an
+  operating scheduled service in the Dec-2017 snapshot," not "is running
+  today."
+- Coverage is **not** "all Indian Railways trains" - it is exactly what
+  the December 2017 government timetable export contained: 11,112
+  unique train numbers, 8,148 station codes, 186,102 imported route
+  stops. Do not represent it as more complete than that.
+
+### Coverage report
+
+| | Count |
+|---|---|
+| Stations imported | 8,148 |
+| Stations enriched with state/coordinates | 7,680 (94.3%) |
+| Trains/services imported | 11,112 |
+| Route stops imported | 186,102 |
+| Route stops rejected (source `NA` values) | 5 |
+| Running-day records | 0 (no source found - see limitations) |
+| Train name conflicts found (first-seen kept) | 1 |
+| `railway.db` size on disk | 18,128,896 bytes (~17.3 MB) |
+| `railway.db` size inside the release APK (compressed) | 7,634,259 bytes (~7.3 MB) |
+| SQLite `integrity_check` | `ok` |
+
+### Reproducing this database
+
+```bash
+dart run scripts/acquire_railway_data.dart --output raw_data
+dart run scripts/transform_railway_data.dart --input raw_data --output build_data
+dart run bin/import_railway_data.dart \
+  --stations build_data/stations.csv \
+  --trains build_data/trains.csv \
+  --route-stops build_data/route_stops.csv \
+  --running-days build_data/running_days.csv \
+  --output assets/database/railway.db \
+  --source "Train_details_22122017.csv (data.gov.in via github.com/itzmeanjan/indian-railway mirror) + stations.json (github.com/datameet/railways, CC0)" \
+  --source-version "2017-12-22 timetable snapshot; datameet stations retrieved 2026-09-02"
+```
+
+`raw_data/` and `build_data/` are gitignored (reproducible, not
+committed); `assets/database/railway.db` - the actual app asset - is
+committed.
+
+### If a newer/better source is found later
+
+A future update replacing this dataset with a fresher or more complete
+one should: re-run the three commands above against the new source,
+update the "Sources" and "Coverage report" sections above, bump the
+app's own version (see "Database versioning" below for why that's
+required for existing installs to actually receive it), and note in the
+release what changed.
 
 ## Architecture
 
@@ -243,12 +324,10 @@ SQL for railway data.
 
 ## Known limitations
 
-- No dataset is bundled yet (see "Status" above) - this is the primary
-  limitation and blocks the rest of Block 2's original scope.
-- Running-day data honesty depends entirely on the source: if the
-  eventual dataset doesn't distinguish "confirmed" from "unknown"
-  itself, every row will import as `confidence: unknown` and the UI
-  must respect that.
+See "Known dataset limitations" above for everything specific to the
+data itself (its 2017 vintage, no running-days, the 468 stations without
+geo enrichment, the 5 rejected rows). Architecturally, beyond that:
+
 - Station search is prefix-based (`LIKE 'query%'`), not a general
   substring or fuzzy search - deliberately, per the "no AI/fuzzy
   matching in this block" requirement.

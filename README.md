@@ -15,11 +15,14 @@ Foundation stage. The current build ships:
 - The Train Yatri design system (theme, buttons, fields, empty/loading/error
   states)
 - Navigation and architecture foundation for the features below
-- The offline railway database schema, import pipeline and repository
-  layer (see [`docs/RAILWAY_DATABASE.md`](docs/RAILWAY_DATABASE.md)) -
-  **infrastructure only for now: no railway dataset is bundled yet**,
-  since none has been supplied. Nothing in the running app depends on
-  it until a real dataset lands.
+- The offline railway database: schema, acquisition/import pipeline,
+  repository layer, and a real packaged dataset (8,148 stations, 11,112
+  trains, 186,102 route stops - a December 2017 government timetable
+  snapshot; no running-day/weekly-calendar data was found from any
+  legitimate source). See
+  [`docs/RAILWAY_DATABASE.md`](docs/RAILWAY_DATABASE.md) for full
+  provenance and known limitations. Nothing in the running UI queries
+  it yet - that lands with search in the next block.
 
 Station/train search, live status, offline tracking, ratings, PNR and
 booking are being built out feature-by-feature on top of this foundation -
@@ -58,8 +61,11 @@ lib/
   services/  # backend clients (RailRadar, location) - added later
   features/  # one folder per screen/feature
   shared/    # design system: theme, reusable widgets, utils
+scripts/
+  acquire_railway_data.dart   # downloads the raw source data
+  transform_railway_data.dart # converts it into the CSVs bin/ consumes
 bin/
-  import_railway_data.dart  # rebuilds assets/database/railway.db from CSV
+  import_railway_data.dart    # rebuilds assets/database/railway.db from CSV
 ```
 
 ## Configuration

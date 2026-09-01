@@ -74,7 +74,12 @@ Future<void> main(List<String> arguments) async {
   final trainsFile = File(args['trains'] as String);
   final routeStopsFile = File(args['route-stops'] as String);
   final runningDaysFile = File(args['running-days'] as String);
-  final outputPath = args['output'] as String;
+  // sqflite_common_ffi's openDatabase() resolves a *relative* path
+  // against its own internal databases directory
+  // (.dart_tool/sqflite_common_ffi/databases/), not this process's
+  // working directory - only an absolute path lands where `--output`
+  // actually says.
+  final outputPath = File(args['output'] as String).absolute.path;
 
   for (final file in [
     stationsFile,

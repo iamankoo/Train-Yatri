@@ -43,3 +43,9 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Downloaded/generated railway data (see scripts/ and
+# docs/RAILWAY_DATABASE.md) - reproducible from source, not committed.
+# assets/database/railway.db (the built result) IS committed.
+/raw_data/
+/build_data/
