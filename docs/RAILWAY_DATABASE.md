@@ -101,6 +101,107 @@ publicly-available sources (full detail below), reproducibly via
 | `railway.db` size inside the release APK (compressed) | 7,634,259 bytes (~7.3 MB) |
 | SQLite `integrity_check` | `ok` |
 
+## Block 2A: dataset expansion research (2026-09-02)
+
+A dedicated pass to try to move past the December 2017 snapshot above
+toward broader, more current coverage, before Block 3 builds search on
+top of it. **Conclusion: no legitimate, currently-obtainable dataset
+was found that improves on what's already packaged.** No data changed;
+`assets/database/railway.db` from Block 2 is unmodified, and no new
+release was created (see "Why no v0.2.1" below).
+
+### What "~26,000 trains a day" actually means
+
+The Indian Railways Year Book 2023-24 (Ministry of Railways) reports
+**13,198 passenger trains and 11,724 freight trains run daily on
+average** (≈24,922, the figure press coverage rounds to "~25,000" or
+"~26,000"). This is a count of **daily train operations/departures**,
+not unique train numbers:
+
+- A single train number that runs daily contributes multiple
+  *operations* over a year but is still just **one** train identity in
+  a database like this one.
+- The figure bundles passenger **and** freight operations together;
+  freight movements don't have a public passenger timetable the way
+  express/passenger/suburban services do, and are out of scope for a
+  passenger-facing app regardless.
+- Neither this project's dataset nor the sources investigated below
+  provide enough information to compute a true "unique train numbers"
+  figure that Indian Railways itself publishes as such - the Year Book
+  reports *operations*, not a deduplicated identity count. This
+  project's own **11,112 unique train numbers** (see Coverage report
+  above) is the only figure this codebase can make a factual claim
+  about, and it should not be equated with, or extrapolated from, the
+  ~25,000 operations figure.
+- Because `running_days` has zero records (see above and below), this
+  project cannot currently compute derived "weekly operations" or
+  "daily operations" statistics of its own - doing so would require
+  operating-day data this dataset does not have. Reporting such numbers
+  without that data would be fabrication, so none are reported.
+
+Source: [Indian Railways Year Book 2023-24](https://www.scribd.com/document/900979178/IR-Year-Book-2023-24-English) figures as summarized in press coverage of the Ministry of Railways' own release; cross-referenced against the [PIB Year End Review 2024](https://www.pib.gov.in/PressReleasePage.aspx?PRID=2088668&reg=48&lang=2).
+
+### Sources investigated and why each was not used
+
+| Source | Vintage | License | Disposition |
+|---|---|---|---|
+| data.gov.in (official catalog, direct) | would be current | GODL-India | **Blocked** - the catalog page returns HTTP 403 to automated fetches and requires interactive/registered browser access. This is the same block hit in the original Block 2 research pass. |
+| github.com/arunasank/indian-railways | Pushed 2016; no commits since | **None declared** (no LICENSE file - all-rights-reserved by GitHub default) | Rejected: no license means no legal basis to redistribute/bundle its data, regardless of content. Also not meaningfully more current than what's already used. |
+| github.com/ankitaanand28/DA323_IndianRailwayTrainDelayDatasets | 2023-2024 | **None declared** | Rejected: no license; also narrow scope (only express trains between Guwahati and 4 metro cities - would not expand national coverage) and built by scraping live enquiry systems as a student project, inheriting that scrape's own terms-of-use uncertainty. |
+| Kaggle ("Indian Express Train Dataset" and others) | Listed as updated 2025 | Varies, often unclear | Rejected: Kaggle dataset files require an authenticated session or Kaggle API token to download in bulk; this project has neither, and using someone's personal Kaggle credentials would violate the "no third-party credentials" rule. The page itself could not even be read without a login-gated SPA shell. |
+| Indian Railways GTFS feed | N/A | N/A | **Does not exist.** Confirmed via the DataMeet/GTFS community itself: "there are no official GTFS feeds by any [Indian transit] agencies," Indian Railways included. |
+| CRIS (Centre for Railway Information Systems) open API / Project Pravah | N/A | N/A | **Not public self-service data.** CRIS's API platform (NTES/PRS/FOIS/EPS, 140+ APIs) serves authorized B2B/B2C integration partners under commercial/legal agreements - this is the domain the product's own later "RailRadar" block is designed to integrate with through a proper backend and credentials, not something to access here without authorization. |
+| National Train Enquiry System (enquiry.indianrail.gov.in) | live | N/A | **Out of scope by design** - this is a live/interactive lookup system, not a bulk dataset. Scraping it per-train (for ~11,000+ trains) to build a static database would both misuse a live system at scale and produce "live status," which is explicitly reserved for the RailRadar block, not this one. |
+| web.archive.org snapshot of data.gov.in | historical | N/A | Inaccessible with the tools available in this environment. |
+
+No dataset providing weekly/daily running-day calendars was found from
+any source, bulk-downloadable or otherwise legitimate to use - this
+remains the dataset's most significant known gap.
+
+### Fresh validation pass against the existing production database
+
+Re-ran full integrity/quality checks against the already-shipped
+`assets/database/railway.db` (unchanged from v0.2.0) as part of this
+research pass:
+
+| Check | Result |
+|---|---|
+| Duplicate `stations.normalized_code` | 0 |
+| Duplicate `trains.normalized_number` | 0 |
+| Orphan `route_stops.train_id` | 0 |
+| Orphan `route_stops.station_id` | 0 |
+| Duplicate `(train_id, stop_sequence)` | 0 |
+| Trains with zero route stops | 0 |
+| `PRAGMA integrity_check` | `ok` |
+| `PRAGMA foreign_key_check` violations | 0 |
+
+Two newly-documented, pre-existing **source** data gaps (not import
+bugs - confirmed by inspecting the source CSV directly):
+
+- **Train 11111** ("GWL-BLP SUSH") has only one recorded stop in the
+  source timetable (its origin, Gwalior) - the rest of its route was
+  never present in the December 2017 export.
+- **Train 11112** ("BLP-GWL", the return working) is missing its
+  `stop_sequence = 1` row in the source - its recorded route starts at
+  sequence 2.
+
+Both are honestly represented as-is (a 1-stop route; a route starting
+at sequence 2) rather than patched with an invented stop - 2 trains out
+of 11,112 (0.02%).
+
+### Why no v0.2.1
+
+Per the definition of this task: "a smaller dataset with verified
+provenance is better than a larger fabricated dataset," and a new
+release should only ship "if this dataset expansion is a meaningful
+production-data upgrade." No new stations, trains, routes, or
+running-day data were legitimately obtainable in this pass - the
+database is byte-for-byte identical to v0.2.0. Shipping v0.2.1 would
+create a release with no actual content difference, which would itself
+be misleading. This document is updated (this section, plus the
+research citations above) but the app version, database, and release
+remain v0.2.0 until a genuine new source is found.
+
 ### Reproducing this database
 
 ```bash
