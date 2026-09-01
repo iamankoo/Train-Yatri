@@ -15,6 +15,11 @@ Foundation stage. The current build ships:
 - The Train Yatri design system (theme, buttons, fields, empty/loading/error
   states)
 - Navigation and architecture foundation for the features below
+- The offline railway database schema, import pipeline and repository
+  layer (see [`docs/RAILWAY_DATABASE.md`](docs/RAILWAY_DATABASE.md)) -
+  **infrastructure only for now: no railway dataset is bundled yet**,
+  since none has been supplied. Nothing in the running app depends on
+  it until a real dataset lands.
 
 Station/train search, live status, offline tracking, ratings, PNR and
 booking are being built out feature-by-feature on top of this foundation -
@@ -24,6 +29,7 @@ none of them show placeholder or fabricated data in the meantime.
 
 - Flutter / Dart
 - Riverpod (state management)
+- SQLite (`sqflite`) for the offline railway database
 
 No AI, chatbot, or LLM features are part of this product.
 
@@ -47,11 +53,13 @@ iOS builds require Xcode on macOS.
 ```
 lib/
   core/      # routing, environment config
-  data/      # database, repositories, models (added as features land)
+  data/      # database, import pipeline, repositories
   domain/    # entities, repository interfaces, services
-  services/  # backend clients (RailRadar, location)
+  services/  # backend clients (RailRadar, location) - added later
   features/  # one folder per screen/feature
   shared/    # design system: theme, reusable widgets, utils
+bin/
+  import_railway_data.dart  # rebuilds assets/database/railway.db from CSV
 ```
 
 ## Configuration

@@ -18,6 +18,38 @@ dependencies:
   # (added from Block 2 onward) provider-injectable without extra boilerplate.
   flutter_riverpod: ^2.6.1
 
+  # Offline SQLite access for the railway database (Block 2). Native
+  # platform SQLite via method channels on Android/iOS - the standard,
+  # most widely-used Flutter SQLite plugin. Only ever imported by
+  # lib/data/database/railway_database.dart, the one file that legitimately
+  # needs the real app (it also needs Flutter's rootBundle for asset
+  # loading).
+  sqflite: ^2.4.1
+
+  # The platform-agnostic Database/DatabaseFactory interfaces `sqflite`
+  # itself is built on - pure Dart, no dependency on package:flutter (and
+  # so, transitively, none on dart:ui). Everything under lib/data/ that
+  # is shared between the running app and the plain-Dart
+  # bin/import_railway_data.dart build tool (and tests) is typed against
+  # this instead of `sqflite` directly, so that tool can actually run
+  # under `dart run` rather than needing the Flutter engine.
+  sqflite_common: ^2.5.8
+
+  # Cross-platform path joining for locating the app's copy of the
+  # railway database file.
+  path: ^1.9.0
+
+  # CSV parsing (quoting/escaping edge cases) for the railway data
+  # import pipeline (lib/data/import/). Pure Dart, no native footprint;
+  # a regular dependency (rather than dev) because this code lives
+  # under lib/, even though it's never reachable from the running app's
+  # own entry point (main.dart) yet and so isn't actually bundled.
+  csv: ^6.0.0
+
+  # Argument parsing for bin/import_railway_data.dart. Pure Dart, no
+  # native footprint.
+  args: ^2.6.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -31,6 +63,12 @@ dev_dependencies:
   # assets/splashscreen.png so there is no blank frame before the
   # Dart splash screen takes over.
   flutter_native_splash: ^2.4.4
+
+  # Pure-Dart (FFI) SQLite factory - lets the railway database code run
+  # under `flutter test` (no Android/iOS platform channel available
+  # there) and under the plain-Dart `bin/import_railway_data.dart` build
+  # tool, without adding a second SQLite package.
+  sqflite_common_ffi: ^2.3.4
 
 flutter:
   uses-material-design: true
