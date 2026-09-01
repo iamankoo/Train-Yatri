@@ -1,0 +1,78 @@
+name: train_yatri
+description: "Train Yatri - fast, simple Indian Railways companion"
+publish_to: 'none'
+
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.11.4
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+
+  # State management + dependency injection foundation for the whole app.
+  # Chosen over bloc/GetX for a small, testable API that keeps repositories
+  # (added from Block 2 onward) provider-injectable without extra boilerplate.
+  flutter_riverpod: ^2.6.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^6.0.0
+
+  # Generates Android/iOS launcher icons from assets/icon.png.
+  flutter_launcher_icons: ^0.14.3
+
+  # Generates the native (pre-Flutter-engine) splash screen from
+  # assets/splashscreen.png so there is no blank frame before the
+  # Dart splash screen takes over.
+  flutter_native_splash: ^2.4.4
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/icon.png
+    - assets/splashscreen.png
+    - assets/mainpage.png
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/icon.png"
+  # icon.png already has square corners with the brand navy fill baked in;
+  # Android adaptive icon reuses it as the foreground on a matching background
+  # so the launcher can still apply its own mask (circle/squircle/etc).
+  adaptive_icon_background: "#103D7D"
+  adaptive_icon_foreground: "assets/icon.png"
+  remove_alpha_ios: true
+
+flutter_native_splash:
+  # Matches the sampled top color of assets/splashscreen.png so the native
+  # splash (shown before the Flutter engine starts) is visually continuous
+  # with the Dart SplashScreen widget that takes over immediately after.
+  # This native splash is only ever on screen for a very brief moment
+  # (until the Flutter engine paints its first frame) - the full ~3s,
+  # full composition of splashscreen.png is rendered by the Dart
+  # SplashScreen widget that takes over right after, undistorted.
+  color: "#002E7B"
+  image: assets/splashscreen.png
+  fullscreen: true
+
+  android_12:
+    # Android 12+'s native splash API only ever shows a small icon inside
+    # a fixed circular mask on top of the background color - it cannot
+    # display arbitrary full-screen artwork. Using the tall composed
+    # splashscreen.png here would have its wordmark/footer text cropped
+    # away by that circle, so the square brand mark (icon.png) is used
+    # instead; the full splashscreen.png still takes over immediately
+    # after via the Dart SplashScreen widget.
+    color: "#002E7B"
+    image: assets/icon.png
+
+  android: true
+  ios: true
