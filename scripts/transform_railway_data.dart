@@ -26,6 +26,13 @@
 //    station list has an entry whose code matches one already present
 //    from the primary source - never used to add a station the primary
 //    source doesn't have, and never used to override its code or name.
+//  - For a station datameet has no state for (its own `state` field is
+//    blank on roughly half its entries), Wikipedia's "List of railway
+//    stations in India" (CC BY-SA 4.0) is checked as a second,
+//    strictly-fallback source by station code - only ever fills a gap,
+//    never overrides a state either earlier source already provided.
+//    A station with no state in any source keeps `state: null` - not
+//    guessed.
 //  - running_days.csv is written with a header only, no rows: neither
 //    source provides a weekly operating calendar, and none was found
 //    from another legitimate bulk-downloadable source (see
@@ -61,6 +68,49 @@ class _RouteRow {
   final String arrivalRaw;
   final String departureRaw;
   final String distanceKm;
+}
+
+final _wikiLinkWithDisplay = RegExp(r'\[\[([^\]|]*)\|([^\]]*)\]\]');
+final _wikiLink = RegExp(r'\[\[([^\]]*)\]\]');
+final _wikiTemplate = RegExp(r'\{\{[^}]*\}\}');
+final _htmlTag = RegExp(r'<[^>]*>');
+final _stationCodePattern = RegExp(r'^[A-Za-z0-9]{1,6}$');
+
+String _stripWikiMarkup(String value) {
+  var s = value.trim();
+  s = s.replaceAllMapped(_wikiLinkWithDisplay, (m) => m.group(2) ?? '');
+  s = s.replaceAllMapped(_wikiLink, (m) => m.group(1) ?? '');
+  s = s.replaceAll(_wikiTemplate, '');
+  s = s.replaceAll(_htmlTag, '');
+  s = s.replaceAll('&nbsp;', ' ');
+  return s.trim();
+}
+
+/// Parses the `{|class="wikitable sortable" ... |}` tables in
+/// Wikipedia's "List of railway stations in India" article
+/// (`action=raw` wikitext) into a station-code -> state map. Each row
+/// looks like `| {{stnlnk|Name}} || CODE || State || Zone || Elevation
+/// || Notes`; only the code and state columns are used. First
+/// occurrence of a code wins if the article itself lists a code twice
+/// with different states (rare, and not worth failing the whole import
+/// over).
+Map<String, String> _parseWikipediaStationStates(String wikitext) {
+  final result = <String, String>{};
+  for (final line in wikitext.split('\n')) {
+    if (!line.startsWith('|') ||
+        line.startsWith('|-') ||
+        line.startsWith('|}')) {
+      continue;
+    }
+    final content = line.replaceFirst(RegExp(r'^\|+\s?'), '');
+    final fields = content.split('||');
+    if (fields.length < 4) continue;
+    final code = _stripWikiMarkup(fields[1]).toUpperCase();
+    final state = _stripWikiMarkup(fields[2]);
+    if (!_stationCodePattern.hasMatch(code) || state.isEmpty) continue;
+    result.putIfAbsent(code, () => state);
+  }
+  return result;
 }
 
 int? _timeToMinutes(String hhmmss) {
@@ -161,7 +211,8 @@ Future<void> main(List<String> arguments) async {
   final geoJson =
       jsonDecode(stationsFile.readAsStringSync()) as Map<String, dynamic>;
   final features = geoJson['features'] as List;
-  var enrichedCount = 0;
+  var stateFromDatameet = 0;
+  var coordsFromDatameet = 0;
   for (final feature in features) {
     final props = (feature as Map<String, dynamic>)['properties'] as Map;
     final code = props['code'] as String?;
@@ -170,20 +221,59 @@ Future<void> main(List<String> arguments) async {
     if (record == null) continue; // not one of our primary-source stations
     final geometry = feature['geometry'] as Map<String, dynamic>?;
     final coords = (geometry?['coordinates'] as List?) ?? const [];
-    record.state = props['state'] as String?;
+    // datameet leaves `state` as "" (not absent) on roughly half its
+    // entries - only take it when it actually has a value, so an empty
+    // string here never overwrites/blocks a later fallback source.
+    final state = props['state'] as String?;
+    if (state != null && state.isNotEmpty) {
+      record.state = state;
+      stateFromDatameet++;
+    }
     if (coords.length == 2) {
       final lon = coords[0] as num?;
       final lat = coords[1] as num?;
       if (lon != null && lat != null) {
         record.longitude = lon.toDouble();
         record.latitude = lat.toDouble();
+        coordsFromDatameet++;
       }
     }
-    enrichedCount++;
   }
   stdout.writeln(
-    'Enriched $enrichedCount / ${stationsByCode.length} stations with state/coordinates from datameet.',
+    'datameet: $stateFromDatameet / ${stationsByCode.length} stations got a state, '
+    '$coordsFromDatameet got coordinates.',
   );
+
+  final wikipediaFile = File('$inputDir/wikipedia_station_list.wikitext');
+  if (wikipediaFile.existsSync()) {
+    stdout.writeln('Reading ${wikipediaFile.path} ...');
+    final wikiStateByCode = _parseWikipediaStationStates(
+      wikipediaFile.readAsStringSync(),
+    );
+    var stateFromWikipedia = 0;
+    for (final record in stationsByCode.values) {
+      if (record.state != null) continue; // datameet already had it
+      final normalizedCode = RailwayNormalization.normalizeCode(record.code);
+      final state = wikiStateByCode[normalizedCode];
+      if (state != null) {
+        record.state = state;
+        stateFromWikipedia++;
+      }
+    }
+    final stillMissing = stationsByCode.values
+        .where((r) => r.state == null)
+        .length;
+    stdout.writeln(
+      'Wikipedia: $stateFromWikipedia additional stations got a state '
+      '(${wikiStateByCode.length} station-code -> state pairs parsed). '
+      '$stillMissing / ${stationsByCode.length} stations still have no '
+      'state from any source - left as null, not guessed.',
+    );
+  } else {
+    stdout.writeln(
+      '${wikipediaFile.path} not found - skipping Wikipedia state fallback.',
+    );
+  }
 
   // --- day_offset derivation ---
   final finalRouteRows = <List<String>>[];

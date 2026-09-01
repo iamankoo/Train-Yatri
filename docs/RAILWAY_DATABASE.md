@@ -7,7 +7,7 @@ database is built, and how the app consumes it.
 
 ## Status: real dataset acquired and packaged
 
-`assets/database/railway.db` is built from two legitimate, licensed,
+`assets/database/railway.db` is built from three legitimate, licensed,
 publicly-available sources (full detail below), reproducibly via
 `scripts/acquire_railway_data.dart` + `scripts/transform_railway_data.dart`
 + `bin/import_railway_data.dart`. Nothing in it is invented.
@@ -46,6 +46,36 @@ publicly-available sources (full detail below), reproducibly via
 - **Fields used:** state, latitude, longitude - added only to a station
   already present from source 1, matched by normalized station code.
   Never used to add a station, or to override a code/name from source 1.
+  **Its own `state` field is blank (`""`, not missing) on roughly half
+  its 8,990 entries** - those don't count as a state for a station even
+  when the code otherwise matches; see source 3.
+
+**3. Wikipedia station list - fallback source, for `state` only, where sources 1-2 leave it blank**
+
+- **Publisher:** Wikipedia, ["List of railway stations in India"](https://en.wikipedia.org/wiki/List_of_railway_stations_in_India).
+- **License:** [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
+  (attribution + share-alike required for reuse - both satisfied by this
+  section).
+- **Retrieved:** 2026-09-02, via `action=raw` wikitext export of the
+  live article (no fixed revision/version - a Wikipedia article changes
+  over time; this project's own `dataset_version` metadata records the
+  retrieval date, not an article revision).
+- **Fields used:** station code, state - parsed from the article's
+  wikitables (`scripts/transform_railway_data.dart`'s
+  `_parseWikipediaStationStates`). Applied **only** to a station that
+  still has `state: null` after source 2 - never to add a station, and
+  never to overwrite a state either earlier source already supplied.
+- **Coverage:** the article itself only documents ~2,820 of the roughly
+  8,000+ stations in the primary dataset (Wikipedia's coverage of minor
+  halts is inherently incomplete) - of the 4,283 stations still missing
+  a state after source 2, this resolves 1,275. The remaining 3,008 stay
+  `state: null`, honestly, rather than guessed. Other Wikipedia-adjacent
+  candidates were evaluated and not used: `arunasank/indian-railways`
+  and `IamYVJ/Indian_Railway_Stations_JSON` (both no declared license);
+  `vstflugel/indian-railway-dataset` (MIT-licensed, but its "regional
+  codes" are Indian Railways *zones*, e.g. "NR"/Northern - a zone spans
+  several states, so mapping it to a single state would misrepresent
+  the data, not fix it).
 
 ### Known dataset limitations (read before trusting a number)
 
@@ -64,11 +94,16 @@ publicly-available sources (full detail below), reproducibly via
   its terms of use). `running_days` is therefore empty for every train.
   `RailwayRepository.getRunningDays()` correctly returns `null` for all
   11,112 trains - this is honest absence, not a bug.
-- **8,148 station codes from source 1; only 7,680 (94%) matched a
-  station in source 2** and got state/coordinates. The remaining 468
-  have `city`/`state`/`latitude`/`longitude` all `NULL` - they are still
-  real, valid stations (present in the primary government-derived
-  source), just without geo enrichment.
+- **8,148 station codes from source 1; 7,639 (94%) matched a station in
+  source 2 and got coordinates.** State coverage is lower: 3,865 (47%)
+  got a state from source 2, a further 1,275 (16%) from source 3
+  (Wikipedia), leaving **3,008 (37%) with `state: null`** - real, valid
+  stations (present in the primary government-derived source), just
+  without a state in any legitimate source found. `city` is `NULL` for
+  every station - datameet's `address` field mixes area and state in
+  one free-text string (e.g. `"Kishangarh Renwal, Rajasthan"`), too
+  messy to split into a clean city value without guessing, so it was
+  left unused rather than misrepresented as `city`.
 - **5 of 186,107 route-stop rows (0.003%) were rejected** - the source
   literally contains `NA` for arrival/departure/distance at station
   `KGIH` on 5 specific train entries. Rejected and reported, not
@@ -91,15 +126,23 @@ publicly-available sources (full detail below), reproducibly via
 | | Count |
 |---|---|
 | Stations imported | 8,148 |
-| Stations enriched with state/coordinates | 7,680 (94.3%) |
+| Stations with coordinates (source 2) | 7,639 (93.8%) |
+| Stations with a state - from source 2 | 3,865 (47.4%) |
+| Stations with a state - additionally from source 3 (Wikipedia) | 1,275 (15.7%) |
+| Stations with a state - total | 5,140 (63.1%) |
+| Stations with no state in any source (`state: null`) | 3,008 (36.9%) |
 | Trains/services imported | 11,112 |
 | Route stops imported | 186,102 |
 | Route stops rejected (source `NA` values) | 5 |
 | Running-day records | 0 (no source found - see limitations) |
 | Train name conflicts found (first-seen kept) | 1 |
-| `railway.db` size on disk | 18,128,896 bytes (~17.3 MB) |
-| `railway.db` size inside the release APK (compressed) | 7,634,259 bytes (~7.3 MB) |
+| `railway.db` size on disk | 18,141,184 bytes (~17.3 MB) |
 | SQLite `integrity_check` | `ok` |
+
+(APK-compressed size is reported per-release in the project's release
+notes, since it now varies by which Android ABI a given APK targets -
+see "Database versioning" below and the release history for current
+figures.)
 
 ## Block 2A: dataset expansion research (2026-09-02)
 
@@ -202,6 +245,16 @@ be misleading. This document is updated (this section, plus the
 research citations above) but the app version, database, and release
 remain v0.2.0 until a genuine new source is found.
 
+**Update (Block 3):** this conclusion held for trains, routes and
+running-days, but was revisited for `state` specifically - Wikipedia's
+"List of railway stations in India" (source 3 above) was found and
+integrated as a fallback for stations datameet leaves without a state,
+resolving 1,275 of the 4,283 that had none. This is a real, if partial,
+improvement over the original Block 2 release; it shipped as part of
+the v0.3.0 release rather than a separate dataset-only release, since
+it landed in the same working session as Block 3's features. See the
+updated "Sources" and "Coverage report" above for current numbers.
+
 ### Reproducing this database
 
 ```bash
@@ -213,8 +266,8 @@ dart run bin/import_railway_data.dart \
   --route-stops build_data/route_stops.csv \
   --running-days build_data/running_days.csv \
   --output assets/database/railway.db \
-  --source "Train_details_22122017.csv (data.gov.in via github.com/itzmeanjan/indian-railway mirror) + stations.json (github.com/datameet/railways, CC0)" \
-  --source-version "2017-12-22 timetable snapshot; datameet stations retrieved 2026-09-02"
+  --source "Train_details_22122017.csv (data.gov.in via github.com/itzmeanjan/indian-railway mirror) + stations.json (github.com/datameet/railways, CC0) + Wikipedia List of railway stations in India (CC BY-SA 4.0, state fallback only)" \
+  --source-version "2017-12-22 timetable snapshot; datameet + Wikipedia state data retrieved 2026-09-02"
 ```
 
 `raw_data/` and `build_data/` are gitignored (reproducible, not

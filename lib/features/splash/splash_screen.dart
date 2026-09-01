@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/routing/app_routes.dart';
+import '../../data/providers/railway_providers.dart';
 import '../../shared/theme/app_colors.dart';
 
 /// The Dart-side splash screen.
@@ -16,16 +18,16 @@ import '../../shared/theme/app_colors.dart';
 /// on a device whose screen is a different shape than the artwork, the
 /// matching gradient background shows at the edges instead of cutting
 /// any of the composition off.
-class SplashScreen extends StatefulWidget {
+class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
 
   static const Duration holdDuration = Duration(seconds: 3);
 
   @override
-  State<SplashScreen> createState() => _SplashScreenState();
+  ConsumerState<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen>
+class _SplashScreenState extends ConsumerState<SplashScreen>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   late final Animation<double> _fade;
@@ -44,6 +46,12 @@ class _SplashScreenState extends State<SplashScreen>
       end: 1,
     ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
     _controller.forward();
+
+    // Fire-and-forget: opens (and copies, on first launch) the railway
+    // database during the splash hold so Home/search rarely has to wait
+    // for it later. Riverpod caches the resulting future regardless of
+    // whether anything is watching it yet.
+    ref.read(railwayRepositoryProvider);
 
     Future.delayed(SplashScreen.holdDuration, () {
       if (!mounted) return;

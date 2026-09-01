@@ -164,6 +164,109 @@ void main() {
     });
   });
 
+  group('findDirectServices', () {
+    test(
+      'finds both trains that stop at NDA then MCB, in that order',
+      () async {
+        final nda = (await repository.getStationByCode('NDA'))!;
+        final mcb = (await repository.getStationByCode('MCB'))!;
+
+        final services = await repository.findDirectServices(
+          fromStationId: nda.stationId,
+          toStationId: mcb.stationId,
+        );
+
+        expect(
+          services.map((s) => s.train.number),
+          containsAll(['00101T', '00102T']),
+        );
+      },
+    );
+
+    test('is direction-sensitive: reversing From/To finds nothing here, '
+        'even though both stations appear on the same routes', () async {
+      final nda = (await repository.getStationByCode('NDA'))!;
+      final mcb = (await repository.getStationByCode('MCB'))!;
+
+      final reversed = await repository.findDirectServices(
+        fromStationId: mcb.stationId,
+        toStationId: nda.stationId,
+      );
+
+      expect(
+        reversed,
+        isEmpty,
+        reason:
+            'both synthetic trains run NDA -> MCB only; MCB -> NDA is not '
+            'a real direction on their routes',
+      );
+    });
+
+    test('returns empty for identical From/To stations', () async {
+      final nda = (await repository.getStationByCode('NDA'))!;
+      final services = await repository.findDirectServices(
+        fromStationId: nda.stationId,
+        toStationId: nda.stationId,
+      );
+      expect(services, isEmpty);
+    });
+
+    test('returns empty when no train connects the two stations', () async {
+      final services = await repository.findDirectServices(
+        fromStationId: 999999,
+        toStationId: 999998,
+      );
+      expect(services, isEmpty);
+    });
+
+    test('the overnight service (00101T) carries dayOffset through to '
+        'fromStop/toStop, and journeyDuration accounts for it', () async {
+      final nda = (await repository.getStationByCode('NDA'))!;
+      final mcb = (await repository.getStationByCode('MCB'))!;
+
+      final services = await repository.findDirectServices(
+        fromStationId: nda.stationId,
+        toStationId: mcb.stationId,
+      );
+      final overnight = services.firstWhere((s) => s.train.number == '00101T');
+
+      expect(overnight.fromStop.dayOffset, 0);
+      expect(overnight.toStop.dayOffset, 1);
+      // 23:50 day 0 -> 00:10 day 1 = 20 minutes, not a negative duration.
+      expect(overnight.journeyDuration, const Duration(minutes: 20));
+    });
+
+    test(
+      'a same-day service (00102T) has a positive, same-day duration',
+      () async {
+        final nda = (await repository.getStationByCode('NDA'))!;
+        final mcb = (await repository.getStationByCode('MCB'))!;
+
+        final services = await repository.findDirectServices(
+          fromStationId: nda.stationId,
+          toStationId: mcb.stationId,
+        );
+        final sameDay = services.firstWhere((s) => s.train.number == '00102T');
+
+        expect(sameDay.fromStop.dayOffset, sameDay.toStop.dayOffset);
+        // 09:00 -> 15:00 = 6 hours.
+        expect(sameDay.journeyDuration, const Duration(hours: 6));
+      },
+    );
+
+    test('respects the limit parameter', () async {
+      final nda = (await repository.getStationByCode('NDA'))!;
+      final mcb = (await repository.getStationByCode('MCB'))!;
+
+      final services = await repository.findDirectServices(
+        fromStationId: nda.stationId,
+        toStationId: mcb.stationId,
+        limit: 1,
+      );
+      expect(services, hasLength(1));
+    });
+  });
+
   group('getRunningDays', () {
     test(
       'returns confirmed running days when the source provided them',

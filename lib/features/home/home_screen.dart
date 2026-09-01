@@ -39,7 +39,7 @@ class HomeScreen extends StatelessWidget {
             HeroBanner(),
             SizedBox(height: AppSpacing.lg),
             JourneySearchCard(),
-            SizedBox(height: AppSpacing.xl),
+            SizedBox(height: AppSpacing.lg),
             QuickActionsSection(),
             SizedBox(height: AppSpacing.xl),
             RecentSearchesSection(),

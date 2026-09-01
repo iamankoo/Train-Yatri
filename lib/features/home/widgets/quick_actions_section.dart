@@ -43,18 +43,26 @@ class QuickActionsSection extends StatelessWidget {
       children: [
         const SectionTitle(title: 'Quick Actions'),
         const SizedBox(height: AppSpacing.md),
-        Row(
-          children: [
-            for (final action in _actions) ...[
-              Expanded(
-                child: _QuickActionTile(
-                  action: action,
-                  onTap: () => showComingSoon(context, action.label),
+        // IntrinsicHeight + stretch: label text can wrap to one or two
+        // lines depending on the action ("Station Search" vs. "Book
+        // Tickets"), which would otherwise make tiles different
+        // heights even though they're already equal-width (Expanded).
+        IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (final action in _actions) ...[
+                Expanded(
+                  child: _QuickActionTile(
+                    action: action,
+                    onTap: () => showComingSoon(context, action.label),
+                  ),
                 ),
-              ),
-              if (action != _actions.last) const SizedBox(width: AppSpacing.sm),
+                if (action != _actions.last)
+                  const SizedBox(width: AppSpacing.sm),
+              ],
             ],
-          ],
+          ),
         ),
       ],
     );
@@ -84,6 +92,7 @@ class _QuickActionTile extends StatelessWidget {
               horizontal: AppSpacing.xs,
             ),
             child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(action.icon, color: action.color, size: 26),
                 const SizedBox(height: AppSpacing.sm),

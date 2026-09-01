@@ -122,6 +122,40 @@ void main() {
       },
     );
 
+    test('findDirectServices(HWH, NDLS) finds the real Howrah Rajdhani '
+        'Express (12301), with a correct overnight duration', () async {
+      if (!dbExists) return markTestSkipped('railway.db not built');
+      final hwh = (await repository.getStationByCode('HWH'))!;
+      final ndls = (await repository.getStationByCode('NDLS'))!;
+
+      final services = await repository.findDirectServices(
+        fromStationId: hwh.stationId,
+        toStationId: ndls.stationId,
+      );
+      expect(services.any((s) => s.train.number == '12301'), isTrue);
+
+      final rajdhani = services.firstWhere((s) => s.train.number == '12301');
+      // Real published schedule: departs HWH 16:55 day 0, arrives
+      // NDLS 10:00 day 1.
+      expect(rajdhani.fromStop.dayOffset, 0);
+      expect(rajdhani.toStop.dayOffset, 1);
+      expect(rajdhani.journeyDuration, isNotNull);
+      expect(rajdhani.journeyDuration!.inHours, greaterThan(12));
+    });
+
+    test('findDirectServices(NDLS, HWH) - the reverse direction - does not '
+        'return 12301, which only runs HWH -> NDLS', () async {
+      if (!dbExists) return markTestSkipped('railway.db not built');
+      final hwh = (await repository.getStationByCode('HWH'))!;
+      final ndls = (await repository.getStationByCode('NDLS'))!;
+
+      final reversed = await repository.findDirectServices(
+        fromStationId: ndls.stationId,
+        toStationId: hwh.stationId,
+      );
+      expect(reversed.any((s) => s.train.number == '12301'), isFalse);
+    });
+
     test('getTrainsAtStation finds real trains stopping at NDLS', () async {
       if (!dbExists) return markTestSkipped('railway.db not built');
       final station = (await repository.getStationByCode('NDLS'))!;

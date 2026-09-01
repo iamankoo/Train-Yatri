@@ -9,54 +9,62 @@ import '../../../shared/theme/app_spacing.dart';
 /// bridge scene here. That illustration was not supplied as its own
 /// asset (only the composed screenshot was), so rather than crop it out
 /// of the reference screenshot and ship it as a fake "asset", this
-/// renders a simple track/skyline motif from real widgets in the brand
-/// palette. A proper illustration can drop in later without touching
-/// any layout code around it.
+/// renders the tagline and a train mark side by side on one line in the
+/// brand palette. A proper illustration can drop in later without
+/// touching any layout code around it.
+///
+/// Deliberately narrower than the full content width (extra horizontal
+/// margin on top of Home's own page padding) so it doesn't visually
+/// compete with the full-width search card below it; the Row layout
+/// (rather than the previous Stack of two corners) keeps the text and
+/// train mark on one line and never lets the icon overlap the text -
+/// the text gets the flexible space, the icon a fixed column.
 class HeroBanner extends StatelessWidget {
   const HeroBanner({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(AppRadius.lg),
-      child: Container(
-        height: 140,
-        width: double.infinity,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [AppColors.brandNavy, AppColors.primary],
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.lg,
+            vertical: AppSpacing.md,
           ),
-        ),
-        child: Stack(
-          children: [
-            // A large Material glyph scaled way up (as a faint background
-            // decoration) renders with visibly hard, blocky edges instead
-            // of a soft pattern, so the banner intentionally stays to the
-            // gradient + a normal-sized icon rather than that effect.
-            Positioned(
-              right: AppSpacing.lg,
-              top: AppSpacing.lg,
-              child: Icon(
-                Icons.train_rounded,
-                size: 56,
-                color: AppColors.textOnDark,
-              ),
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [AppColors.brandNavy, AppColors.primary],
             ),
-            const Positioned(
-              left: AppSpacing.lg,
-              bottom: AppSpacing.lg,
-              child: Text(
-                'Track any train, anywhere in India',
-                style: TextStyle(
-                  color: AppColors.textOnDark,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              const Expanded(
+                child: Text(
+                  'Track any train, anywhere in India',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: AppColors.textOnDark,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    height: 1.3,
+                  ),
                 ),
               ),
-            ),
-          ],
+              const SizedBox(width: AppSpacing.md),
+              Icon(
+                Icons.train_rounded,
+                size: 36,
+                color: AppColors.textOnDark.withValues(alpha: 0.9),
+              ),
+            ],
+          ),
         ),
       ),
     );

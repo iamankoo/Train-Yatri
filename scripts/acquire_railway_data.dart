@@ -21,6 +21,12 @@
 //     station code matches - never to add stations source 1 doesn't
 //     have, and never to override its code/name.
 //
+//  3. Wikipedia's "List of railway stations in India" - CC BY-SA 4.0 -
+//     a station-code-to-state table, used only to fill `state` for a
+//     station still missing it after source 2 (datameet's own `state`
+//     field is blank for roughly half its entries) - never to add a
+//     station or override a state either earlier source already gave.
+//
 // data.gov.in's own catalog page (data.gov.in/catalog/indian-railways-
 // train-time-table) returns HTTP 403 to automated fetches and requires
 // interactive/registered access to browse - this script uses the two
@@ -34,6 +40,14 @@ const _sources = {
       'https://raw.githubusercontent.com/itzmeanjan/indian-railway/master/data/Train_details_22122017.csv',
   'datameet_stations.json':
       'https://raw.githubusercontent.com/datameet/railways/master/stations.json',
+  // Wikipedia's "List of railway stations in India" - a station
+  // code -> state table, CC BY-SA 4.0. Used only to fill in `state` for
+  // stations source 1 provides but source 2's own state field is blank
+  // for (datameet's `state` property is empty on roughly half its
+  // entries) - never to add a station or override a state either
+  // earlier source already gave.
+  'wikipedia_station_list.wikitext':
+      'https://en.wikipedia.org/w/index.php?title=List_of_railway_stations_in_India&action=raw',
 };
 
 Future<void> main(List<String> arguments) async {

@@ -2,6 +2,7 @@ import 'package:sqflite_common/sqlite_api.dart';
 
 import '../../domain/entities/data_confidence.dart';
 import '../../domain/entities/dataset_metadata.dart';
+import '../../domain/entities/direct_service.dart';
 import '../../domain/entities/railway_time.dart';
 import '../../domain/entities/route_stop.dart';
 import '../../domain/entities/running_days.dart';
@@ -155,6 +156,86 @@ class SqliteRailwayRepository implements RailwayRepository {
       trainCount: row['train_count'] as int,
       routeStopCount: row['route_stop_count'] as int,
     );
+  }
+
+  @override
+  Future<List<DirectService>> findDirectServices({
+    required int fromStationId,
+    required int toStationId,
+    int limit = 50,
+  }) async {
+    if (fromStationId == toStationId) return const [];
+
+    // rs_from is filtered first (uses idx_route_stops_station), then
+    // joined to rs_to on the same train (idx_route_stops_train_station
+    // / idx_route_stops_train_sequence) - stop_sequence, not time of
+    // day, is what actually encodes "from occurs before to" along a
+    // route, so that comparison is what enforces direction here.
+    final rows = await db.rawQuery(
+      '''
+      SELECT
+        t.train_id, t.number, t.name, t.is_active, t.confidence,
+        rs_from.route_stop_id AS from_route_stop_id,
+        rs_from.stop_sequence AS from_stop_sequence,
+        rs_from.arrival_time AS from_arrival_time,
+        rs_from.departure_time AS from_departure_time,
+        rs_from.day_offset AS from_day_offset,
+        rs_from.distance_km AS from_distance_km,
+        rs_to.route_stop_id AS to_route_stop_id,
+        rs_to.stop_sequence AS to_stop_sequence,
+        rs_to.arrival_time AS to_arrival_time,
+        rs_to.departure_time AS to_departure_time,
+        rs_to.day_offset AS to_day_offset,
+        rs_to.distance_km AS to_distance_km
+      FROM route_stops rs_from
+      JOIN route_stops rs_to
+        ON rs_to.train_id = rs_from.train_id
+        AND rs_to.station_id = ?
+        AND rs_to.stop_sequence > rs_from.stop_sequence
+      JOIN trains t ON t.train_id = rs_from.train_id
+      WHERE rs_from.station_id = ?
+      ORDER BY rs_from.day_offset, rs_from.departure_time
+      LIMIT ?
+      ''',
+      [toStationId, fromStationId, limit],
+    );
+
+    return rows.map((row) {
+      final train = TrainService(
+        trainId: row['train_id'] as int,
+        number: row['number'] as String,
+        name: row['name'] as String,
+        isActive: (row['is_active'] as int) == 1,
+        confidence: (row['confidence'] as String) == 'confirmed'
+            ? DataConfidence.confirmed
+            : DataConfidence.unknown,
+      );
+      final fromStop = RouteStop(
+        routeStopId: row['from_route_stop_id'] as int,
+        trainId: train.trainId,
+        stationId: fromStationId,
+        stopSequence: row['from_stop_sequence'] as int,
+        arrivalTime: RailwayTime.tryParse(row['from_arrival_time'] as String?),
+        departureTime: RailwayTime.tryParse(
+          row['from_departure_time'] as String?,
+        ),
+        dayOffset: row['from_day_offset'] as int,
+        distanceKm: row['from_distance_km'] as double?,
+      );
+      final toStop = RouteStop(
+        routeStopId: row['to_route_stop_id'] as int,
+        trainId: train.trainId,
+        stationId: toStationId,
+        stopSequence: row['to_stop_sequence'] as int,
+        arrivalTime: RailwayTime.tryParse(row['to_arrival_time'] as String?),
+        departureTime: RailwayTime.tryParse(
+          row['to_departure_time'] as String?,
+        ),
+        dayOffset: row['to_day_offset'] as int,
+        distanceKm: row['to_distance_km'] as double?,
+      );
+      return DirectService(train: train, fromStop: fromStop, toStop: toStop);
+    }).toList();
   }
 
   Station _stationFromRow(Map<String, Object?> row) => Station(

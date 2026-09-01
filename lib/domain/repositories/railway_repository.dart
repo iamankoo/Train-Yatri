@@ -1,4 +1,5 @@
 import '../entities/dataset_metadata.dart';
+import '../entities/direct_service.dart';
 import '../entities/route_stop.dart';
 import '../entities/running_days.dart';
 import '../entities/station.dart';
@@ -47,4 +48,15 @@ abstract interface class RailwayRepository {
 
   /// Provenance/versioning of the currently loaded dataset.
   Future<DatasetMetadata> getDatasetMetadata();
+
+  /// Trains that stop at [fromStationId] and later - by route stop
+  /// order, not merely "also somewhere on the route" - at
+  /// [toStationId]. Ordered by departure time from [fromStationId].
+  /// Returns at most [limit] results. Empty if no such train exists, or
+  /// if [fromStationId] equals [toStationId].
+  Future<List<DirectService>> findDirectServices({
+    required int fromStationId,
+    required int toStationId,
+    int limit = 50,
+  });
 }
