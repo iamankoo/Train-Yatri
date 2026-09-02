@@ -27,8 +27,8 @@ const _updateRelease = GitHubRelease(
   htmlUrl: 'https://github.com/iamankoo/Train-Yatri/releases/tag/v9.9.9',
   assets: [
     ReleaseAsset(
-      name: 'train-yatri-v9.9.9-armeabi-v7a.apk',
-      downloadUrl: 'https://example.com/train-yatri-v9.9.9-armeabi-v7a.apk',
+      name: 'train-yatri-v9.9.9.apk',
+      downloadUrl: 'https://example.com/train-yatri-v9.9.9.apk',
       sizeBytes: 1000,
     ),
   ],

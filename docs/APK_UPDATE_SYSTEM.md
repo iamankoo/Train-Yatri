@@ -1,4 +1,4 @@
-# Android APK update system (Block 4)
+# Android APK update system (Block 4; packaging updated in Block 5)
 
 Train Yatri is distributed as a directly-installed APK via GitHub
 Releases, not the Play Store (see the release process in this repo's own
@@ -64,18 +64,20 @@ tuple compare; the app is offered an update only when
 `latest > installed`, so a stale/older release tag (or a downgrade)
 never gets suggested.
 
-## Which APK: ABI selection (C4)
+## Which APK: a single universal build (changed in v0.5.0)
 
-Releases ship three ABI-specific APKs (see "Release naming" below):
-`arm64-v8a`, `armeabi-v7a`, `x86_64` - built via
-`flutter build apk --release --split-per-abi` (see "Part D" in this
-block's own report for the size rationale). `lib/core/update/apk_asset_selector.dart`
-picks exactly one, using `dart:ffi`'s `Abi.current()` - the ABI this
-exact running process actually is - with **zero extra dependency or
-platform channel**. An ABI this project doesn't build a split for (32-bit
-x86, riscv64, …) falls back to `armeabi-v7a`, the documented safe
-choice: nearly every Android device, arm64 included, can execute
-armeabi-v7a code via the platform's own backward compatibility.
+Block 4 (v0.1.0-v0.4.0) shipped three ABI-specific APKs per release and
+had the client pick one by `Abi.current()`. **From v0.5.0 on, every
+release publishes exactly one universal APK** -
+`train-yatri-vX.Y.Z.apk`, built via plain `flutter build apk --release`
+(no `--split-per-abi`) - installable on any supported Android device.
+`lib/core/update/apk_asset_selector.dart` simply picks the one asset
+matching that exact filename pattern; there is no ABI detection left to
+do. The v0.1.0-v0.4.0 per-ABI releases remain on GitHub exactly as
+published (GitHub Releases are a permanent historical archive - old
+assets are never deleted), but the update checker only ever looks at
+the *latest* release, which from v0.5.0 on always has just this one
+asset.
 
 ## Download, validation and retry (C3)
 
@@ -160,26 +162,30 @@ prompt. **Nothing in Block 4 reads or enforces this field** -
 has a typed place to plug into without the update-check plumbing
 itself needing to change shape.
 
-## Release naming convention
+## Release naming convention (v0.5.0+)
 
-Every release publishes:
+Every release publishes exactly:
 
 ```
-train-yatri-vX.Y.Z-arm64-v8a.apk
-train-yatri-vX.Y.Z-arm64-v8a.apk.sha256
-train-yatri-vX.Y.Z-armeabi-v7a.apk
-train-yatri-vX.Y.Z-armeabi-v7a.apk.sha256
-train-yatri-vX.Y.Z-x86_64.apk
-train-yatri-vX.Y.Z-x86_64.apk.sha256
+train-yatri-vX.Y.Z.apk
+train-yatri-vX.Y.Z.apk.sha256
 ```
 
-`ApkAssetSelector` matches on the exact `-<abi>.apk` suffix - never a
-different asset, never more than one per install.
+and nothing else - no per-ABI variants, no debug build, no iOS
+artifact. `ApkAssetSelector` matches the exact universal-APK filename
+pattern; anything else (a `.sha256` file, a stray legacy per-ABI asset,
+a source archive) is ignored.
+
+Locally, multiple ABI-specific APKs may still be *built* when useful
+for testing (`flutter build apk --release --split-per-abi`), but only
+the universal build is ever uploaded to a release, and local build
+output is cleaned up after verification - see "Local build artifacts"
+below.
 
 ## Testing
 
 - `test/core/update/`: pure-Dart unit tests (semantic version parsing/
-  comparison, ABI selection incl. the fallback case, the full
+  comparison, universal-APK asset selection, the full
   check/checkDetailed decision table via a fake `ReleaseSource`, and
   `ApkDownloader` against a real local `HttpServer` - progress, size
   mismatch, non-200, checksum match/mismatch).
@@ -212,6 +218,16 @@ release as "already installed" and never offering an update at all.
 Bumped to `0.4.0+4` for this release; **every future release must bump
 this field to match its own tag**, or the whole update system silently
 stops working for whoever installed the mismatched version.
+
+## Local build artifacts
+
+Only the current block's build output is kept on disk
+(`build/app/outputs/flutter-apk/`, `release_staging/`) - older blocks'
+local APKs and intermediate per-ABI builds are deleted once a release
+is verified and published. This is purely a local-disk hygiene rule;
+**GitHub Releases themselves are the permanent archive and are never
+touched** - every prior release's assets (including v0.1.0-v0.4.0's
+per-ABI APKs) remain exactly as published.
 
 ## Known limitations
 

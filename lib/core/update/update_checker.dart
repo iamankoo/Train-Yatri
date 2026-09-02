@@ -1,5 +1,3 @@
-import 'dart:ffi';
-
 import 'apk_asset_selector.dart';
 import 'release_source.dart';
 import 'semantic_version.dart';
@@ -17,11 +15,6 @@ abstract final class UpdateChecker {
   static Future<UpdateCheckResult> checkDetailed({
     required String installedVersion,
     required ReleaseSource releaseSource,
-    // Overridable purely for deterministic tests (see
-    // test/core/update/update_checker_test.dart) - the real app never
-    // passes this, so ApkAssetSelector.select always uses this
-    // process's own actual Abi.current().
-    Abi? currentAbi,
   }) async {
     const failed = UpdateCheckResult(status: UpdateCheckStatus.checkFailed);
 
@@ -38,7 +31,7 @@ abstract final class UpdateChecker {
       return const UpdateCheckResult(status: UpdateCheckStatus.upToDate);
     }
 
-    final asset = ApkAssetSelector.select(release, currentAbi: currentAbi);
+    final asset = ApkAssetSelector.select(release);
     if (asset == null) return failed;
 
     return UpdateCheckResult(
@@ -60,12 +53,10 @@ abstract final class UpdateChecker {
   static Future<UpdateInfo?> check({
     required String installedVersion,
     required ReleaseSource releaseSource,
-    Abi? currentAbi,
   }) async {
     final result = await checkDetailed(
       installedVersion: installedVersion,
       releaseSource: releaseSource,
-      currentAbi: currentAbi,
     );
     return result.status == UpdateCheckStatus.updateAvailable
         ? result.updateInfo

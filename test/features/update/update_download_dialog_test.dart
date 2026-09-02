@@ -100,7 +100,7 @@ final _updateInfo = UpdateInfo(
   latestVersion: const SemanticVersion(major: 9, minor: 9, patch: 9),
   release: const GitHubRelease(tagName: 'v9.9.9', htmlUrl: '', assets: []),
   asset: const ReleaseAsset(
-    name: 'train-yatri-v9.9.9-armeabi-v7a.apk',
+    name: 'train-yatri-v9.9.9.apk',
     downloadUrl: 'https://example.com/apk',
     sizeBytes: 200,
   ),
@@ -184,7 +184,7 @@ void main() {
     // _updateInfo, where every plausible progress value rounds to the
     // same "0.0 MB").
     const fiveMbAsset = ReleaseAsset(
-      name: 'train-yatri-v9.9.9-armeabi-v7a.apk',
+      name: 'train-yatri-v9.9.9.apk',
       downloadUrl: 'https://example.com/apk',
       sizeBytes: 5 * 1024 * 1024,
     );

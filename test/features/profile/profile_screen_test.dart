@@ -68,7 +68,7 @@ void main() {
             htmlUrl: '',
             assets: [
               ReleaseAsset(
-                name: 'train-yatri-v0.4.0-armeabi-v7a.apk',
+                name: 'train-yatri-v0.4.0.apk',
                 downloadUrl: 'https://example.com/apk',
                 sizeBytes: 1000,
               ),

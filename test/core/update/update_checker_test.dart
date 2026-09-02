@@ -1,5 +1,3 @@
-import 'dart:ffi';
-
 import 'package:flutter_test/flutter_test.dart';
 import 'package:train_yatri/core/update/github_release.dart';
 import 'package:train_yatri/core/update/release_source.dart';
@@ -16,8 +14,8 @@ class _FakeReleaseSource implements ReleaseSource {
 
 const _apkAssets = [
   ReleaseAsset(
-    name: 'train-yatri-v0.4.0-arm64-v8a.apk',
-    downloadUrl: 'https://example.com/arm64.apk',
+    name: 'train-yatri-v0.4.0.apk',
+    downloadUrl: 'https://example.com/train-yatri-v0.4.0.apk',
     sizeBytes: 1000,
   ),
 ];
@@ -35,12 +33,11 @@ void main() {
       final result = await UpdateChecker.checkDetailed(
         installedVersion: '0.3.0',
         releaseSource: source,
-        currentAbi: Abi.androidArm64,
       );
 
       expect(result.status, UpdateCheckStatus.updateAvailable);
       expect(result.updateInfo!.latestVersion.toString(), '0.4.0');
-      expect(result.updateInfo!.asset.name, 'train-yatri-v0.4.0-arm64-v8a.apk');
+      expect(result.updateInfo!.asset.name, 'train-yatri-v0.4.0.apk');
     });
 
     test('upToDate when the installed version equals the release', () async {
@@ -50,7 +47,6 @@ void main() {
       final result = await UpdateChecker.checkDetailed(
         installedVersion: '0.4.0',
         releaseSource: source,
-        currentAbi: Abi.androidArm64,
       );
       expect(result.status, UpdateCheckStatus.upToDate);
       expect(result.updateInfo, isNull);
@@ -64,7 +60,6 @@ void main() {
       final result = await UpdateChecker.checkDetailed(
         installedVersion: '0.4.0',
         releaseSource: source,
-        currentAbi: Abi.androidArm64,
       );
       expect(result.status, UpdateCheckStatus.upToDate);
     });
@@ -75,7 +70,6 @@ void main() {
       final result = await UpdateChecker.checkDetailed(
         installedVersion: '0.3.0',
         releaseSource: source,
-        currentAbi: Abi.androidArm64,
       );
       expect(result.status, UpdateCheckStatus.checkFailed);
       expect(result.updateInfo, isNull);
@@ -94,13 +88,12 @@ void main() {
         final result = await UpdateChecker.checkDetailed(
           installedVersion: '0.3.0',
           releaseSource: source,
-          currentAbi: Abi.androidArm64,
         );
         expect(result.status, UpdateCheckStatus.checkFailed);
       },
     );
 
-    test('checkFailed when the release has no APK asset for this ABI (C4: '
+    test('checkFailed when the release has no universal-APK asset (never '
         'never falls back to an unrelated asset)', () async {
       final source = _FakeReleaseSource(
         const GitHubRelease(
@@ -118,7 +111,6 @@ void main() {
       final result = await UpdateChecker.checkDetailed(
         installedVersion: '0.3.0',
         releaseSource: source,
-        currentAbi: Abi.androidArm64,
       );
       expect(result.status, UpdateCheckStatus.checkFailed);
     });
@@ -136,7 +128,6 @@ void main() {
         final result = await UpdateChecker.checkDetailed(
           installedVersion: 'garbage',
           releaseSource: source,
-          currentAbi: Abi.androidArm64,
         );
         expect(result.status, UpdateCheckStatus.checkFailed);
       },
@@ -151,7 +142,6 @@ void main() {
       final info = await UpdateChecker.check(
         installedVersion: '0.3.0',
         releaseSource: source,
-        currentAbi: Abi.androidArm64,
       );
       expect(info, isNotNull);
     });
