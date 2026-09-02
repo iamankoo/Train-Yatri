@@ -4,6 +4,7 @@ import '../../../domain/entities/direct_service.dart';
 import '../../../shared/theme/app_colors.dart';
 import '../../../shared/theme/app_spacing.dart';
 import '../../../shared/theme/app_text_styles.dart';
+import '../../../shared/utils/duration_formatter.dart';
 import '../../../shared/widgets/train_yatri_card.dart';
 import '../../train_details/train_details_screen.dart';
 
@@ -80,7 +81,7 @@ class TrainResultCard extends StatelessWidget {
                         children: [
                           if (duration != null)
                             Text(
-                              _formatDuration(duration),
+                              DurationFormatter.hoursMinutes(duration),
                               style: AppTextStyles.label,
                             )
                           else
@@ -103,12 +104,6 @@ class TrainResultCard extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  String _formatDuration(Duration duration) {
-    final hours = duration.inHours;
-    final minutes = duration.inMinutes.remainder(60);
-    return '${hours}h ${minutes.toString().padLeft(2, '0')}m';
   }
 }
 

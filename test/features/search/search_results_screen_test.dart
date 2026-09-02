@@ -18,22 +18,6 @@ Widget _wrap(Widget child) {
 }
 
 void main() {
-  testWidgets('shows the historical-data notice on every result screen', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      _wrap(
-        SearchResultsScreen(from: _nda, to: _mcb, date: DateTime(2026, 9, 2)),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    expect(
-      find.textContaining('Schedule data is from Dec 2017'),
-      findsOneWidget,
-    );
-  });
-
   testWidgets('shows From/To codes and the selected date in the header', (
     tester,
   ) async {
@@ -76,22 +60,20 @@ void main() {
     expect(find.text('+1 day'), findsOneWidget);
   });
 
-  testWidgets(
-    'shows an honest empty state for a route with no direct service',
-    (tester) async {
-      // JXN -> NDA: JXN is only ever an intermediate stop, never followed
-      // by NDA later in either synthetic route, so no direct service
-      // legitimately exists for this pair.
-      await tester.pumpWidget(
-        _wrap(
-          SearchResultsScreen(from: _jxn, to: _nda, date: DateTime(2026, 9, 2)),
-        ),
-      );
-      await tester.pumpAndSettle();
+  testWidgets('shows an honest "no journey found" empty state when neither a '
+      'direct service nor any connection exists', (tester) async {
+    // JXN -> NDA: JXN is only ever an intermediate stop on trains
+    // that continue on to MCB, never back to NDA - no direct service
+    // and no connection legitimately exists for this pair.
+    await tester.pumpWidget(
+      _wrap(
+        SearchResultsScreen(from: _jxn, to: _nda, date: DateTime(2026, 9, 2)),
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      expect(find.text('No direct trains found'), findsOneWidget);
-    },
-  );
+    expect(find.text('No journey found'), findsOneWidget);
+  });
 
   testWidgets('the back button returns to the caller', (tester) async {
     await tester.pumpWidget(

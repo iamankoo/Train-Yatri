@@ -8,7 +8,6 @@ import '../../shared/theme/app_spacing.dart';
 import '../../shared/theme/app_text_styles.dart';
 import '../../shared/widgets/empty_state.dart';
 import '../../shared/widgets/error_state.dart';
-import '../../shared/widgets/historical_data_notice.dart';
 import '../../shared/widgets/loading_state.dart';
 import '../../shared/widgets/train_yatri_card.dart';
 import 'widgets/route_timeline.dart';
@@ -55,15 +54,6 @@ class _TrainDetailsScreenState extends ConsumerState<TrainDetailsScreen> {
         child: Column(
           children: [
             _Header(train: widget.train),
-            const Padding(
-              padding: EdgeInsets.fromLTRB(
-                AppSpacing.lg,
-                0,
-                AppSpacing.lg,
-                AppSpacing.sm,
-              ),
-              child: HistoricalDataNotice(),
-            ),
             Expanded(
               child: FutureBuilder<List<RouteStopWithStation>>(
                 future: _future,

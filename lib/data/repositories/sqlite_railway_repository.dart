@@ -9,6 +9,7 @@ import '../../domain/entities/route_stop_with_station.dart';
 import '../../domain/entities/running_days.dart';
 import '../../domain/entities/station.dart';
 import '../../domain/entities/train_service.dart';
+import '../../domain/entities/train_stop.dart';
 import '../../domain/repositories/railway_repository.dart';
 import '../../domain/services/railway_normalization.dart';
 
@@ -225,7 +226,7 @@ class SqliteRailwayRepository implements RailwayRepository {
         AND rs_to.stop_sequence > rs_from.stop_sequence
       JOIN trains t ON t.train_id = rs_from.train_id
       WHERE rs_from.station_id = ?
-      ORDER BY rs_from.day_offset, rs_from.departure_time
+      ORDER BY rs_from.day_offset, rs_from.departure_time, t.normalized_number
       LIMIT ?
       ''',
       [toStationId, fromStationId, limit],
@@ -267,6 +268,40 @@ class SqliteRailwayRepository implements RailwayRepository {
       );
       return DirectService(train: train, fromStop: fromStop, toStop: toStop);
     }).toList();
+  }
+
+  @override
+  Future<List<TrainStop>> findDepartures(
+    int stationId, {
+    int limit = 20,
+  }) async {
+    final rows = await db.query(
+      'route_stops',
+      where: 'station_id = ? AND departure_time IS NOT NULL',
+      whereArgs: [stationId],
+      orderBy: 'day_offset, departure_time',
+      limit: limit,
+    );
+    if (rows.isEmpty) return const [];
+
+    final trainIds = rows.map((r) => r['train_id'] as int).toSet();
+    final trainRows = await db.query(
+      'trains',
+      where: 'train_id IN (${List.filled(trainIds.length, '?').join(',')})',
+      whereArgs: trainIds.toList(),
+    );
+    final trainsById = {
+      for (final row in trainRows) row['train_id'] as int: _trainFromRow(row),
+    };
+
+    return rows
+        .map(
+          (row) => TrainStop(
+            train: trainsById[row['train_id'] as int]!,
+            stop: _routeStopFromRow(row),
+          ),
+        )
+        .toList();
   }
 
   Station _stationFromRow(Map<String, Object?> row) => Station(

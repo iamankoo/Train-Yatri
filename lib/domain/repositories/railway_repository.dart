@@ -5,6 +5,7 @@ import '../entities/route_stop_with_station.dart';
 import '../entities/running_days.dart';
 import '../entities/station.dart';
 import '../entities/train_service.dart';
+import '../entities/train_stop.dart';
 
 /// The one abstraction future features (station search, train search,
 /// train details, journey discovery) are built against. UI code and
@@ -67,4 +68,13 @@ abstract interface class RailwayRepository {
     required int toStationId,
     int limit = 50,
   });
+
+  /// Trains that depart [stationId] (i.e. have a recorded, non-null
+  /// departure time there - a stop that's only ever a train's terminus
+  /// is excluded, since nothing departs from it), earliest departure
+  /// first (by `day_offset` then `departure_time`). Returns at most
+  /// [limit] - the candidate-generation building block for
+  /// `JourneyDiscoveryService`'s connecting-journey search (Block 5),
+  /// not used by direct search.
+  Future<List<TrainStop>> findDepartures(int stationId, {int limit = 20});
 }

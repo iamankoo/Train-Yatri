@@ -188,6 +188,42 @@ void main() {
     });
   });
 
+  group('findDepartures', () {
+    test('returns trains departing the station, earliest first', () async {
+      final nda = (await repository.getStationByCode('NDA'))!;
+      final departures = await repository.findDepartures(nda.stationId);
+
+      // 00102T departs NDA at 09:00, 00101T at 23:50 - both trains'
+      // origin is NDA in this fixture.
+      expect(departures.map((d) => d.train.number), ['00102T', '00101T']);
+      expect(departures.first.stop.departureTime!.toDbString(), '09:00');
+    });
+
+    test(
+      'excludes a stop with no departure time (a train\'s terminus)',
+      () async {
+        final mcb = (await repository.getStationByCode('MCB'))!;
+        final departures = await repository.findDepartures(mcb.stationId);
+        // Both synthetic trains terminate at MCB - neither has a
+        // departure time recorded there.
+        expect(departures, isEmpty);
+      },
+    );
+
+    test('respects the limit parameter', () async {
+      final nda = (await repository.getStationByCode('NDA'))!;
+      final departures = await repository.findDepartures(
+        nda.stationId,
+        limit: 1,
+      );
+      expect(departures, hasLength(1));
+    });
+
+    test('empty list for a station with no recorded departures', () async {
+      expect(await repository.findDepartures(999999), isEmpty);
+    });
+  });
+
   group('getTrainsAtStation', () {
     test('finds every train that stops at a station', () async {
       final station = (await repository.getStationByCode('MCB'))!;

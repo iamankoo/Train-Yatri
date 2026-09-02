@@ -2,25 +2,25 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/providers/railway_providers.dart';
-import '../../domain/entities/direct_service.dart';
 import '../../domain/entities/station.dart';
+import '../../domain/services/journey_discovery_service.dart';
 import '../../shared/theme/app_colors.dart';
 import '../../shared/theme/app_spacing.dart';
 import '../../shared/theme/app_text_styles.dart';
 import '../../shared/utils/date_formatter.dart';
 import '../../shared/widgets/empty_state.dart';
 import '../../shared/widgets/error_state.dart';
-import '../../shared/widgets/historical_data_notice.dart';
 import '../../shared/widgets/loading_state.dart';
+import '../../shared/widgets/section_title.dart';
+import 'widgets/connecting_journey_card.dart';
 import 'widgets/train_result_card.dart';
 
-/// The first real Search Results screen: direct (single-train, no
-/// change of train) services between [from] and [to] on [date],
-/// queried straight from the offline SQLite database via
-/// `RailwayRepository.findDirectServices`. [date] is retained on the
-/// request (per the product's date-aware-search requirement) but is
-/// not used to filter results - the dataset has no operating-day
-/// calendar to filter by (see [HistoricalDataNotice]).
+/// Search Results (Block 5): direct services and one-change connecting
+/// journeys between [from] and [to] on [date], via
+/// `JourneyDiscoveryService.discover` - direct services and
+/// connections come straight from the offline SQLite database, never
+/// fabricated. [date] is retained on the request (per the product's
+/// date-aware-search requirement) but is not used to filter results.
 class SearchResultsScreen extends ConsumerStatefulWidget {
   const SearchResultsScreen({
     required this.from,
@@ -39,7 +39,7 @@ class SearchResultsScreen extends ConsumerStatefulWidget {
 }
 
 class _SearchResultsScreenState extends ConsumerState<SearchResultsScreen> {
-  late Future<List<DirectService>> _future;
+  late Future<JourneyDiscoveryResult> _future;
 
   @override
   void initState() {
@@ -47,9 +47,10 @@ class _SearchResultsScreenState extends ConsumerState<SearchResultsScreen> {
     _future = _search();
   }
 
-  Future<List<DirectService>> _search() async {
+  Future<JourneyDiscoveryResult> _search() async {
     final repository = await ref.read(railwayRepositoryProvider.future);
-    return repository.findDirectServices(
+    return JourneyDiscoveryService.discover(
+      repository: repository,
       fromStationId: widget.from.stationId,
       toStationId: widget.to.stationId,
     );
@@ -64,17 +65,8 @@ class _SearchResultsScreenState extends ConsumerState<SearchResultsScreen> {
         child: Column(
           children: [
             _Header(from: widget.from, to: widget.to, date: widget.date),
-            const Padding(
-              padding: EdgeInsets.fromLTRB(
-                AppSpacing.lg,
-                0,
-                AppSpacing.lg,
-                AppSpacing.sm,
-              ),
-              child: HistoricalDataNotice(),
-            ),
             Expanded(
-              child: FutureBuilder<List<DirectService>>(
+              child: FutureBuilder<JourneyDiscoveryResult>(
                 future: _future,
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
@@ -86,32 +78,77 @@ class _SearchResultsScreenState extends ConsumerState<SearchResultsScreen> {
                       onRetry: _retry,
                     );
                   }
-                  final results = snapshot.data ?? const [];
-                  if (results.isEmpty) {
+                  final result = snapshot.data;
+                  if (result == null || result.isEmpty) {
                     return const EmptyState(
                       icon: Icons.train_outlined,
-                      message: 'No direct trains found',
+                      message: 'No journey found',
                     );
                   }
-                  return ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(
-                      AppSpacing.lg,
-                      AppSpacing.sm,
-                      AppSpacing.lg,
-                      AppSpacing.xl,
-                    ),
-                    itemCount: results.length,
-                    separatorBuilder: (_, _) =>
-                        const SizedBox(height: AppSpacing.sm),
-                    itemBuilder: (context, index) =>
-                        TrainResultCard(service: results[index]),
-                  );
+                  return _ResultsList(result: result);
                 },
               ),
             ),
           ],
         ),
       ),
+    );
+  }
+}
+
+class _ResultsList extends StatelessWidget {
+  const _ResultsList({required this.result});
+
+  final JourneyDiscoveryResult result;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasDirect = result.direct.isNotEmpty;
+    final hasConnecting = result.connecting.isNotEmpty;
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.lg,
+        AppSpacing.sm,
+        AppSpacing.lg,
+        AppSpacing.xl,
+      ),
+      children: [
+        if (hasDirect) ...[
+          const SectionTitle(title: 'Direct'),
+          const SizedBox(height: AppSpacing.sm),
+          for (final service in result.direct) ...[
+            TrainResultCard(service: service),
+            const SizedBox(height: AppSpacing.sm),
+          ],
+        ] else ...[
+          Semantics(
+            label: 'No direct trains found',
+            child: const Text(
+              'No direct trains found',
+              style: AppTextStyles.bodyMuted,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          if (hasConnecting)
+            Semantics(
+              label: 'Connections available',
+              child: const Text(
+                'Connections available',
+                style: AppTextStyles.bodyMuted,
+              ),
+            ),
+        ],
+        if (hasConnecting) ...[
+          if (hasDirect) const SizedBox(height: AppSpacing.md),
+          const SectionTitle(title: '1 Change'),
+          const SizedBox(height: AppSpacing.sm),
+          for (final journey in result.connecting) ...[
+            ConnectingJourneyCard(journey: journey),
+            const SizedBox(height: AppSpacing.sm),
+          ],
+        ],
+      ],
     );
   }
 }

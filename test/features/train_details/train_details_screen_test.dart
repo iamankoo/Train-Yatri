@@ -31,22 +31,14 @@ Future<TrainService> _lookupTrain(String number) async {
 }
 
 void main() {
-  testWidgets(
-    'shows the train name, number and the historical-data disclosure',
-    (tester) async {
-      final train = await _lookupTrain('00101T');
-      await tester.pumpWidget(_wrap(TrainDetailsScreen(train: train)));
-      await tester.pumpAndSettle();
+  testWidgets('shows the train name and number', (tester) async {
+    final train = await _lookupTrain('00101T');
+    await tester.pumpWidget(_wrap(TrainDetailsScreen(train: train)));
+    await tester.pumpAndSettle();
 
-      expect(find.text('Test Overnight Express'), findsOneWidget);
-      expect(find.textContaining('#00101T'), findsOneWidget);
-      expect(
-        find.textContaining('Schedule data is from Dec 2017'),
-        findsOneWidget,
-      );
-      expect(find.textContaining('Operating days unavailable'), findsOneWidget);
-    },
-  );
+    expect(find.text('Test Overnight Express'), findsOneWidget);
+    expect(find.textContaining('#00101T'), findsOneWidget);
+  });
 
   testWidgets(
     'renders the real ordered route: origin, intermediate stop, destination',
