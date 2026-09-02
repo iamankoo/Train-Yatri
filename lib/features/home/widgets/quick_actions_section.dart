@@ -5,6 +5,7 @@ import '../../../shared/theme/app_spacing.dart';
 import '../../../shared/theme/app_text_styles.dart';
 import '../../../shared/utils/coming_soon.dart';
 import '../../../shared/widgets/section_title.dart';
+import '../../live_tracking/live_tab_screen.dart';
 
 class _QuickAction {
   const _QuickAction(this.label, this.icon, this.color);
@@ -14,10 +15,10 @@ class _QuickAction {
 }
 
 /// Compact quick-action tiles. Every action here is a real feature on
-/// the product roadmap (live status, PNR, station search, booking) but
-/// none of them are wired up yet in Block 1, so each shows honest
-/// "coming soon" feedback instead of a dead tap or a fabricated result
-/// screen.
+/// the product roadmap (live status, PNR, station search, booking).
+/// "Live Status" opens the real feature (Block 6); the rest remain
+/// unwired and show honest "coming soon" feedback instead of a dead
+/// tap or a fabricated result screen.
 class QuickActionsSection extends StatelessWidget {
   const QuickActionsSection({super.key});
 
@@ -55,7 +56,13 @@ class QuickActionsSection extends StatelessWidget {
                 Expanded(
                   child: _QuickActionTile(
                     action: action,
-                    onTap: () => showComingSoon(context, action.label),
+                    onTap: action.label == 'Live Status'
+                        ? () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const LiveTabScreen(),
+                            ),
+                          )
+                        : () => showComingSoon(context, action.label),
                   ),
                 ),
                 if (action != _actions.last)

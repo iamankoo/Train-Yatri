@@ -200,7 +200,21 @@ void main() {
     }
   });
 
-  testWidgets('tapping a non-Home tab gives feedback instead of navigating', (
+  testWidgets(
+    'tapping the still-unwired Journeys tab gives feedback instead of navigating',
+    (tester) async {
+      _useTallSurface(tester);
+      await tester.pumpWidget(_wrap(const HomeScreen()));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Journeys'));
+      await tester.pump();
+
+      expect(find.textContaining('coming soon'), findsOneWidget);
+    },
+  );
+
+  testWidgets('tapping Live opens the real Live Status feature (Block 6)', (
     tester,
   ) async {
     _useTallSurface(tester);
@@ -208,9 +222,10 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Live'));
-    await tester.pump();
+    await tester.pumpAndSettle();
 
-    expect(find.textContaining('coming soon'), findsOneWidget);
+    expect(find.text('Live Status'), findsOneWidget);
+    expect(find.textContaining('coming soon'), findsNothing);
   });
 
   for (final width in [320.0, 360.0, 390.0, 412.0]) {

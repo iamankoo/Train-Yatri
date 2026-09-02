@@ -4,4 +4,12 @@
          to allow setting breakpoints, to provide hot reload, etc.
     -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Block 6: debug builds only (this file never merges into the
+         release APK) may reach a plain-HTTP local backend
+         (http://10.0.2.2:PORT, the Android emulator's alias for the
+         host machine) for local live-status development/testing - see
+         docs/LIVE_STATUS.md "Environment configuration". The release
+         manifest has no such override, so the production APK can only
+         ever reach an HTTPS backend (Block 6 Part 36). -->
+    <application android:usesCleartextTraffic="true"/>
 </manifest>

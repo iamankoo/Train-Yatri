@@ -1,14 +1,40 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:train_yatri/domain/entities/live_train_status.dart';
 import 'package:train_yatri/domain/entities/train_service.dart';
+import 'package:train_yatri/domain/repositories/live_status_repository.dart';
+import 'package:train_yatri/features/live_tracking/live_status_controller.dart';
 import 'package:train_yatri/features/train_details/train_details_screen.dart';
 
 import '../../test_support/fake_railway_repository.dart';
 
+/// Resolves immediately with a fixed, safe error - so any test that
+/// navigates into the real `LiveStatusScreen` (via the "Live Status"
+/// action) never makes a real network call, exactly like
+/// `fakeRailwayRepositoryOverride` keeps the static route view off the
+/// real filesystem database.
+class _FakeLiveStatusRepository implements LiveStatusRepository {
+  @override
+  Future<LiveTrainStatus> getLiveStatus(
+    String trainNumber, {
+    String? journeyDate,
+  }) async {
+    throw const LiveStatusException(
+      LiveStatusFailureCategory.notFound,
+      "Live status isn't available for this train.",
+    );
+  }
+}
+
 Widget _wrap(Widget child) {
   return ProviderScope(
-    overrides: [fakeRailwayRepositoryOverride()],
+    overrides: [
+      fakeRailwayRepositoryOverride(),
+      liveStatusRepositoryProvider.overrideWithValue(
+        _FakeLiveStatusRepository(),
+      ),
+    ],
     child: MaterialApp(home: child),
   );
 }
@@ -73,16 +99,19 @@ void main() {
   });
 
   testWidgets(
-    'never shows any live/fabricated fields this dataset does not have',
+    'never shows any live/fabricated status values inline in the static route',
     (tester) async {
       final train = await _lookupTrain('00101T');
       await tester.pumpWidget(_wrap(TrainDetailsScreen(train: train)));
       await tester.pumpAndSettle();
 
+      // "Live Status" itself is an intentional, real action (Block 6) -
+      // it opens a clearly separate screen rather than being merged
+      // into this static route view, so it's excluded from the
+      // forbidden list below.
       for (final forbidden in [
         'Platform',
         'PNR',
-        'Live',
         'Delay',
         'ETA',
         'Fare',
@@ -91,6 +120,30 @@ void main() {
       ]) {
         expect(find.textContaining(forbidden), findsNothing);
       }
+    },
+  );
+
+  testWidgets(
+    'offers a "Live Status" action that opens the real Block 6 feature',
+    (tester) async {
+      final train = await _lookupTrain('00101T');
+      await tester.pumpWidget(_wrap(TrainDetailsScreen(train: train)));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Live Status'), findsOneWidget);
+
+      await tester.tap(find.text('Live Status'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining(train.number), findsWidgets);
+      // The fake repository (see _FakeLiveStatusRepository) resolves
+      // to a safe not-found error - proves the real screen, controller
+      // and error-state wiring all work end to end without ever
+      // touching a real network call in this test.
+      expect(
+        find.text("Live status isn't available for this train."),
+        findsOneWidget,
+      );
     },
   );
 

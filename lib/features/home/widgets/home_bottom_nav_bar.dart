@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../shared/theme/app_colors.dart';
 import '../../../shared/theme/app_text_styles.dart';
 import '../../../shared/utils/coming_soon.dart';
+import '../../live_tracking/live_tab_screen.dart';
 import '../../profile/profile_screen.dart';
 
 class _NavItem {
@@ -13,14 +14,14 @@ class _NavItem {
 
 /// Bottom navigation shell.
 ///
-/// "Home" is a real, built destination since Block 1. Live (Block 6/7)
-/// and Journeys (Block 3/9) remain the product's planned feature areas
-/// and are presented as visibly *inactive* - tapping them gives honest
-/// "coming soon" feedback rather than navigating to an empty screen or
-/// implying functionality that isn't there yet. "Profile" now opens a
-/// deliberately minimal screen (Block 4, C8: only the update-check
-/// surface) - the full Profile feature itself is still Block 8/9's
-/// scope.
+/// "Home" is a real, built destination since Block 1. "Live" now opens
+/// the real Live Status feature (Block 6). Journeys (Block 3/9) remains
+/// a planned feature area and is presented as visibly *inactive* -
+/// tapping it gives honest "coming soon" feedback rather than
+/// navigating to an empty screen or implying functionality that isn't
+/// there yet. "Profile" now opens a deliberately minimal screen (Block
+/// 4, C8: only the update-check surface) - the full Profile feature
+/// itself is still Block 8/9's scope.
 class HomeBottomNavBar extends StatelessWidget {
   const HomeBottomNavBar({super.key});
 
@@ -55,6 +56,12 @@ class HomeBottomNavBar extends StatelessWidget {
                         ? () => Navigator.of(context).push(
                             MaterialPageRoute(
                               builder: (_) => const ProfileScreen(),
+                            ),
+                          )
+                        : item.label == 'Live'
+                        ? () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const LiveTabScreen(),
                             ),
                           )
                         : () => showComingSoon(context, item.label),

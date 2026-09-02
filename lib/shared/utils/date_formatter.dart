@@ -22,4 +22,14 @@ abstract final class DateFormatter {
     final month = _months[date.month - 1];
     return '$day $month, ${date.year}';
   }
+
+  /// 24-hour "HH:MM", local time - used by Live Status (Block 6) for
+  /// `lastUpdatedAt` and scheduled/actual route-stop times, which
+  /// already arrive as local `DateTime`s (see
+  /// `BackendLiveStatusRepository`'s `.toLocal()` parsing).
+  static String time(DateTime dateTime) {
+    final hour = dateTime.hour.toString().padLeft(2, '0');
+    final minute = dateTime.minute.toString().padLeft(2, '0');
+    return '$hour:$minute';
+  }
 }

@@ -10,18 +10,21 @@ import '../../shared/widgets/empty_state.dart';
 import '../../shared/widgets/error_state.dart';
 import '../../shared/widgets/loading_state.dart';
 import '../../shared/widgets/train_yatri_card.dart';
+import '../live_tracking/live_status_screen.dart';
 import 'widgets/route_timeline.dart';
 
 /// The real Train Details screen (Block 4): a train's full, ordered
 /// route straight from the offline SQLite database via
 /// `RailwayRepository.getRouteWithStations`.
 ///
-/// Shows only what the static Dec-2017 timetable dataset actually
-/// contains - stop sequence, station, arrival/departure time, day
-/// offset, distance. Deliberately never shows current location, live
-/// delay, platform, fare, seat availability, PNR, live ETA or running
-/// status - none of that exists in this dataset, and this block is not
-/// the one responsible for adding it.
+/// Shows only what the offline timetable dataset actually contains -
+/// stop sequence, station, arrival/departure time, day offset,
+/// distance. Deliberately never shows live delay, current location,
+/// platform, fare, seat availability, PNR or live ETA inline - none of
+/// that is static schedule data. Real live running status (Block 6) is
+/// one tap away via the "Live Status" action, which is a clearly
+/// separate, RailRadar-backed screen (`LiveStatusScreen`) rather than
+/// being merged into this static route view.
 class TrainDetailsScreen extends ConsumerStatefulWidget {
   const TrainDetailsScreen({required this.train, super.key});
 
@@ -50,6 +53,18 @@ class _TrainDetailsScreenState extends ConsumerState<TrainDetailsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => LiveStatusScreen(
+              trainNumber: widget.train.number,
+              trainName: widget.train.name,
+            ),
+          ),
+        ),
+        icon: const Icon(Icons.train_rounded),
+        label: const Text('Live Status'),
+      ),
       body: SafeArea(
         child: Column(
           children: [
