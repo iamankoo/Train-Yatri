@@ -121,7 +121,9 @@ builds only, for local emulator testing against `http://10.0.2.2:PORT`).
 
 ## Deployment (Render)
 
-`backend/render.yaml` is a Render Blueprint: a public Web Service,
+`render.yaml` (repository root - Render's Blueprint auto-detection
+requires it there, even though the service itself lives in `backend/`
+via `rootDir`) is a Render Blueprint: a public Web Service,
 `rootDir: backend`, `healthCheckPath: /healthz`, and
 `RAILRADAR_API_KEY` declared with `sync: false` (Render prompts for the
 real value in its dashboard - the key is never in this repository).
