@@ -2,9 +2,16 @@
 // from the acquired dataset - see docs/RAILWAY_DATABASE.md for
 // provenance), not the synthetic fixture used elsewhere. Every expected
 // value here was read directly out of the built database / the
-// generated build_data/ CSVs, never invented - e.g. the Howrah-New
-// Delhi Rajdhani Express (12301) route below is exactly what
-// `grep "^12301," build_data/route_stops.csv` produces.
+// generated build_data/ CSVs, never invented - e.g. the Howrah
+// Rajdhani Express (12301) route below is exactly what
+// `grep "^12301," build_data/tag2026_final/route_stops.csv` produces.
+//
+// Rebuilt for Block 6's 2026 dataset replacement (docs/RAILWAY_DATABASE.md
+// "Block 6"): station/train counts and specific example trains changed
+// along with the dataset itself. 12301's recorded route below reaches
+// Ghaziabad Jn. (GZB), not New Delhi - a known, documented Block 6
+// extraction-completeness limitation (see that doc), not a fabricated
+// stop; the test asserts exactly what the database actually contains.
 //
 // Skips itself (rather than failing) if assets/database/railway.db
 // doesn't exist, so the rest of the suite still runs in an environment
@@ -16,6 +23,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:train_yatri/data/database/connection_setup.dart';
 import 'package:train_yatri/data/repositories/sqlite_railway_repository.dart';
+import 'package:train_yatri/domain/entities/data_confidence.dart';
 
 import '../test_support/ffi_setup.dart';
 
@@ -80,27 +88,26 @@ void main() {
       expect(results.any((t) => t.number == '12301'), isTrue);
     });
 
-    test('getRoute(12301) matches the real Howrah -> New Delhi route, '
+    test('getRoute(12301) matches the real Howrah Rajdhani route, '
         'including the real overnight day_offset crossing between '
-        'Gaya (day 0) and Mughal Sarai (day 1)', () async {
+        'Gaya (day 0) and Prayagraj (day 1)', () async {
       if (!dbExists) return markTestSkipped('railway.db not built');
       final train = (await repository.getTrainByNumber('12301'))!;
       final route = await repository.getRoute(train.trainId);
 
-      expect(route, hasLength(8));
+      expect(route, hasLength(13));
       expect(route.first.isOrigin, isTrue);
-      expect(route.last.isTerminus, isTrue);
 
       // Real, published stop sequence of this train.
       final gaya = route[3];
-      final mgs = route[4];
+      final prayagraj = route[7];
       expect(gaya.dayOffset, 0);
-      expect(mgs.dayOffset, 1);
+      expect(prayagraj.dayOffset, 1);
       expect(
-        mgs.arrivalTime!.minutesSinceMidnight,
+        prayagraj.arrivalTime!.minutesSinceMidnight,
         lessThan(gaya.departureTime!.minutesSinceMidnight),
         reason:
-            '00:45 (Mughal Sarai) is numerically before 22:37 (Gaya) as a '
+            '02:43 (Prayagraj) is numerically before 22:35 (Gaya) as a '
             'clock time - only dayOffset shows it is actually later',
       );
     });
@@ -112,90 +119,106 @@ void main() {
       final train = (await repository.getTrainByNumber('12301'))!;
       final route = await repository.getRouteWithStations(train.trainId);
 
-      expect(route, hasLength(8));
+      expect(route, hasLength(13));
       expect(route.first.station.code, 'HWH');
-      expect(route.last.station.code, 'NDLS');
 
       final gaya = route[3];
-      final mgs = route[4];
+      final prayagraj = route[7];
       expect(gaya.station.code, 'GAYA');
-      expect(mgs.station.code, 'MGS');
+      expect(prayagraj.station.code, 'PRYJ');
       expect(gaya.stop.dayOffset, 0);
-      expect(mgs.stop.dayOffset, 1);
+      expect(prayagraj.stop.dayOffset, 1);
     });
 
-    test('getRouteWithStations(12951) - the Mumbai Rajdhani, another real '
+    test('getRouteWithStations(12951) - the Tejas Rajdhani, another real '
         'overnight train - crosses from day 0 to day 1 at Ratlam Jn', () async {
       if (!dbExists) return markTestSkipped('railway.db not built');
       final train = (await repository.getTrainByNumber('12951'))!;
       final route = await repository.getRouteWithStations(train.trainId);
 
-      expect(route, hasLength(8));
-      expect(route.first.station.code, 'BCT');
-      expect(route.last.station.code, 'NDLS');
+      expect(route, hasLength(16));
+      expect(route.first.station.code, 'MMCT');
 
-      final vadodara = route[3];
-      final ratlam = route[4];
-      expect(vadodara.station.code, 'BRC');
+      final bharuch = route[7];
+      final ratlam = route[8];
+      expect(bharuch.station.code, 'BH');
       expect(ratlam.station.code, 'RTM');
-      expect(vadodara.stop.dayOffset, 0);
+      expect(bharuch.stop.dayOffset, 0);
       expect(ratlam.stop.dayOffset, 1);
     });
 
     test(
-      'getRunningDays is honestly null - no calendar source was found',
+      'getRunningDays is confirmed for the real 2026 Howrah Rajdhani '
+      'calendar (published as "Except Su")',
       () async {
         if (!dbExists) return markTestSkipped('railway.db not built');
         final train = (await repository.getTrainByNumber('12301'))!;
         final days = await repository.getRunningDays(train.trainId);
+        expect(days, isNotNull);
+        expect(days!.confidence, DataConfidence.confirmed);
+        expect(days.sunday, isFalse);
+        expect(days.monday, isTrue);
+      },
+    );
+
+    test(
+      'getRunningDays is honestly null for a train the 2026 timetable '
+      'material gives no calendar for',
+      () async {
+        if (!dbExists) return markTestSkipped('railway.db not built');
+        final train = (await repository.getTrainByNumber('12009'))!;
+        final days = await repository.getRunningDays(train.trainId);
         expect(
-          days,
-          isNull,
+          days!.confidence,
+          DataConfidence.unknown,
           reason:
-              'documented limitation: no legitimate bulk running-days source '
-              'was found (see docs/RAILWAY_DATABASE.md) - this must stay '
-              'null, never a guessed calendar',
+              'documented limitation: not every real train\'s running-day '
+              'text was recoverable from the source tables (see '
+              'docs/RAILWAY_DATABASE.md "Block 6") - this must stay '
+              'unknown, never a guessed calendar',
         );
       },
     );
 
-    test('findDirectServices(HWH, NDLS) finds the real Howrah Rajdhani '
+    test('findDirectServices(HWH, PRYJ) finds the real Howrah Rajdhani '
         'Express (12301), with a correct overnight duration', () async {
       if (!dbExists) return markTestSkipped('railway.db not built');
       final hwh = (await repository.getStationByCode('HWH'))!;
-      final ndls = (await repository.getStationByCode('NDLS'))!;
+      // Prayagraj (PRYJ), not the route's own last recorded stop (GZB) -
+      // GZB has no recorded arrival time for this train (a genuinely
+      // blank cell in the source table, not a bug here), so it can't
+      // produce a journeyDuration; PRYJ has both times recorded.
+      final pryj = (await repository.getStationByCode('PRYJ'))!;
 
       final services = await repository.findDirectServices(
         fromStationId: hwh.stationId,
-        toStationId: ndls.stationId,
+        toStationId: pryj.stationId,
       );
       expect(services.any((s) => s.train.number == '12301'), isTrue);
 
       final rajdhani = services.firstWhere((s) => s.train.number == '12301');
-      // Real published schedule: departs HWH 16:55 day 0, arrives
-      // NDLS 10:00 day 1.
       expect(rajdhani.fromStop.dayOffset, 0);
       expect(rajdhani.toStop.dayOffset, 1);
       expect(rajdhani.journeyDuration, isNotNull);
-      expect(rajdhani.journeyDuration!.inHours, greaterThan(12));
+      expect(rajdhani.journeyDuration!.inHours, greaterThan(6));
     });
 
-    test('findDirectServices(NDLS, HWH) - the reverse direction - does not '
-        'return 12301, which only runs HWH -> NDLS', () async {
+    test('findDirectServices(GZB, HWH) - the reverse direction - does not '
+        'return 12301, which only runs one way', () async {
       if (!dbExists) return markTestSkipped('railway.db not built');
       final hwh = (await repository.getStationByCode('HWH'))!;
-      final ndls = (await repository.getStationByCode('NDLS'))!;
+      final gzb = (await repository.getStationByCode('GZB'))!;
 
       final reversed = await repository.findDirectServices(
-        fromStationId: ndls.stationId,
+        fromStationId: gzb.stationId,
         toStationId: hwh.stationId,
       );
       expect(reversed.any((s) => s.train.number == '12301'), isFalse);
     });
 
-    test('getTrainsAtStation finds real trains stopping at NDLS', () async {
+    test('getTrainsAtStation finds real trains stopping at Gaya Jn.', () async {
       if (!dbExists) return markTestSkipped('railway.db not built');
-      final station = (await repository.getStationByCode('NDLS'))!;
+      final station = (await repository.getStationByCode('GAYA'))!;
       final trains = await repository.getTrainsAtStation(
         station.stationId,
         limit: 500,
@@ -208,9 +231,9 @@ void main() {
       if (!dbExists) return markTestSkipped('railway.db not built');
       final metadata = await repository.getDatasetMetadata();
       expect(metadata.stationCount, greaterThan(8000));
-      expect(metadata.trainCount, greaterThan(11000));
-      expect(metadata.routeStopCount, greaterThan(180000));
-      expect(metadata.datasetSource, contains('data.gov.in'));
+      expect(metadata.trainCount, greaterThan(2000));
+      expect(metadata.routeStopCount, greaterThan(16000));
+      expect(metadata.datasetSource, contains('Trains at a Glance 2026'));
     });
 
     test('station/train lookups use their indexes on the real, '

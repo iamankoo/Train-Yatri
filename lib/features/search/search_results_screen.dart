@@ -9,6 +9,7 @@ import '../../domain/entities/direct_service.dart';
 import '../../domain/entities/station.dart';
 import '../../domain/repositories/running_days_lookup_repository.dart';
 import '../../domain/services/journey_discovery_service.dart';
+import '../../domain/services/running_days_filter.dart';
 import '../../shared/theme/app_colors.dart';
 import '../../shared/theme/app_spacing.dart';
 import '../../shared/theme/app_text_styles.dart';
@@ -24,8 +25,10 @@ import 'widgets/train_result_card.dart';
 /// journeys between [from] and [to] on [date], via
 /// `JourneyDiscoveryService.discover` - direct services and
 /// connections come straight from the offline SQLite database, never
-/// fabricated. [date] is retained on the request (per the product's
-/// date-aware-search requirement) but is not used to filter results.
+/// fabricated. A result is excluded when the static running-days table
+/// *confirms* it doesn't operate on [date]'s weekday (see
+/// `RunningDaysFilter`, Block 6) - a service with no running-days data
+/// at all is never excluded on that basis alone.
 class SearchResultsScreen extends ConsumerStatefulWidget {
   const SearchResultsScreen({
     required this.from,
@@ -61,10 +64,20 @@ class _SearchResultsScreenState extends ConsumerState<SearchResultsScreen> {
 
   Future<JourneyDiscoveryResult> _search() async {
     final repository = await ref.read(railwayRepositoryProvider.future);
-    final result = await JourneyDiscoveryService.discover(
+    final discovered = await JourneyDiscoveryService.discover(
       repository: repository,
       fromStationId: widget.from.stationId,
       toStationId: widget.to.stationId,
+    );
+    // A train the static 2026 dataset *confirms* does not run on
+    // widget.date's weekday is removed here - never merely because
+    // running-days data is absent for it (see RunningDaysFilter's own
+    // doc comment). This is offline/local-DB only, distinct from the
+    // additive RailRadar-backed "Running on <date>" section below.
+    final result = await RunningDaysFilter.apply(
+      repository: repository,
+      result: discovered,
+      weekday: widget.date.weekday,
     );
     if (result.direct.isNotEmpty) {
       unawaited(_loadRunningDays(result.direct));

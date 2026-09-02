@@ -510,10 +510,16 @@ may be blank - they are stored as `NULL`, never a placeholder.
 
 **trains.csv**
 ```
-number,name,is_active
+number,name,is_active,category,paired_train_number
 ```
 `number` and `name` are required. `is_active` is `1`/`0`/`true`/`false`/
-blank (blank = active).
+blank (blank = active). `category` and `paired_train_number` (added in
+Block 6, schema version 2) are both optional/blank-allowed: `category`
+is `regular`/`named_premium`/`tod_special` when the source distinguishes
+it, blank when unknown; `paired_train_number` is the other direction's
+train number when the source states a pairing (e.g. `12302` on `12301`'s
+row), blank otherwise - recorded for reference only, never used to merge
+the two trains into one row.
 
 **route_stops.csv**
 ```
@@ -635,3 +641,217 @@ new-dataset release does not automatically invalidate a device's
 existing copy on its own. If in-place dataset refresh without a schema
 bump becomes a real requirement, that's a deliberate follow-up, not
 implicit behavior here.
+
+## Block 6: 2026 dataset replacement (final Block 6 pass)
+
+The user reported that Train Yatri was showing trains that no longer
+run, with wrong numbers/names/routes, and traced this to the root
+cause the earlier blocks always documented as a known limitation: the
+December-2017 timetable snapshot (Sources 1-4 above) is now nine years
+stale. This section documents the from-scratch replacement built from
+the current official Indian Railways timetable, per that report.
+
+### Primary source
+
+**Indian Railways Railway Board - "Trains at a Glance 2026" (TAG-2026),
+effective 1 January 2026**, published at
+`https://indianrailways.gov.in/railwayboard/uploads/directorate/coaching/TAG_2026/`
+(discovered via the Railway Board's own view_section page, confirmed
+live 2026-09-02; retrieval date recorded per-file in
+`raw_data/tag2026/manifest.json`). Three document types were used, in
+the order the task required (index first for ground truth, then the
+actual detailed stop-by-stop tables, never stopping at the index):
+
+1. **`TableNumberIndex.pdf` + `Train_Name_Index.pdf`** - the ground
+   truth for "which train numbers currently exist": train number(s),
+   origin, destination, name, and which numbered table(s) carry that
+   train's detailed route. Cross-referencing the two independent
+   indexes (they occasionally use different name conventions for the
+   same train, e.g. `"Exp"` vs `"Ajmer Exp"` - one is simply a
+   shortened form the other document doesn't use, not a real conflict)
+   gives **2,406 unique current train numbers** - already a very
+   different, much more current population than the 2017 dataset's
+   11,112.
+2. **`Station_Code_Index.pdf`** - a supplementary source of station
+   code<->name pairs, used only as a fallback when a table's station
+   name doesn't match an existing `stations.csv` entry (never to add a
+   station the index alone can't corroborate a code for, and never to
+   modify an existing station).
+3. **The 97 numbered detailed timetable tables** (`1.pdf` .. `97.pdf`,
+   discovered via a "Select Table No." dropdown on the source page that
+   a plain link-scrape does not surface) - the actual stop-by-stop
+   route data: station, Km, arrival/departure time per train column,
+   plus each train's real **"Days of departure at originating
+   station"** text (`"Daily"`, `"Except <days>"`, a day list) - the
+   basis for real, source-backed `running_days`, not an assumption.
+   `26-1.pdf` (a monsoon-timing variant of Table 26) is listed in the
+   dropdown but the file returns HTTP 404 on the live site - the base
+   Table 26 route is unaffected; only that seasonal timing variant is
+   unavailable.
+
+The 13 named-category summary PDFs (Rajdhani, Shatabdi, Duronto,
+Humsafar, Jan Shatabdi, Amrit Bharat, Vande Bharat, TOD Special,
+Sampark Kranti, Double Decker, Antyodaya, Yuva/Tejas/Uday/Gatiman, Namo
+Bharat) were used only to classify a train's `category`
+(`named_premium`/`tod_special`/`regular`) by checking which category
+PDF(s) list its number - never as a route/timing source.
+
+### Extraction method
+
+A one-time, dev-time-only Python extraction stage
+(`scripts/tag2026/*.py`, gitignored `.venv`, `pdfplumber`+`requests`)
+feeds the *existing, unchanged* `bin/import_railway_data.dart` CSV
+pipeline - this was a deliberate scoping decision: Dart has no usable
+PDF table-layout library, and introducing one language for a dev-time
+extraction tool (never shipped, never a runtime dependency) is a much
+smaller footprint than trying to force PDF layout parsing into Dart.
+
+- `fetch_tag2026.py` downloads every index/category/table PDF.
+- `parse_indexes.py` builds the number-ground-truth described above.
+- `parse_table.py` is the core per-table parser. The tables are real
+  matrices (station rows x train columns) with no visible cell borders,
+  so column identity has to come from word x-positions, not
+  `pdfplumber.extract_tables()` (verified unreliable on this exact
+  layout) or plain linear text (verified to silently drop tokens on
+  rows with several consecutive skipped stations, which desyncs column
+  order). Two real bugs were found and fixed by manually cross-checking
+  parsed output against the source PDF, not assumed correct:
+  - `pdfplumber`'s own word-builder corrupts text where two sub-lines
+    sit very close together vertically (the arrival/departure stacked
+    pair) - fixed by building words directly from character positions
+    instead (`pdf_columns.get_words_from_chars`).
+  - A station's *name* label prints at the exact vertical **midpoint**
+    between its arrival and departure sub-lines, not stacked
+    sequentially above them - a naive top-to-bottom read silently
+    shifted every arrival time onto the *previous* station (caught by
+    hand-checking that Kanpur Central's arrival was ending up on
+    Etawah's row for train 12301/Howrah Rajdhani). Row reconstruction
+    instead finds each name line's flag line(s) by their geometric
+    offset from that midpoint.
+  - A wrapped or hyphen-broken station name (e.g. "Pt. Deen Dayal
+    Upad-" / "hyaya Jn.") splits its own flag data across both physical
+    lines too; these are detected and merged by their complementary
+    arrival-only/departure-only column signature, not left as two
+    fictitious stations.
+- `parse_running_days.py` turns the real day-text vocabulary above into
+  the 7 boolean columns + `confidence='confirmed'`; anything it can't
+  parse stays `confidence='unknown'` - never a guessed calendar.
+- `reconcile.py` cross-references every parsed table entry against the
+  index ground truth, matches station names to existing (or, as a
+  fallback, `Station_Code_Index.pdf`-sourced) codes, computes
+  `day_offset` via the same deterministic "time earlier than the
+  previous real stop implies a day boundary" rule the 2017 importer
+  already used, and writes the final CSVs plus
+  `build_data/tag2026_final/data_quality_report.json`.
+
+### 31 tables use an unsupported layout - documented, not silently dropped
+
+97 numbered tables exist; **31 use a different, "twin-block" layout**
+(a paired up/down service shown side-by-side sharing one station-name
+column, plus 4 narrow/hill-gauge tourist tables - Kalka-Shimla,
+Darjeeling, Kangra Valley, Nilgiri - that bundle multiple routes into
+one oversized page) that this pass's parser does not support. Trains
+whose *only* table reference points at one of these 31 are reported as
+unresolved with reason `only_in_unsupported_layout_tables`, not
+silently dropped or guessed from the index alone. The 31: 28, 45, 46,
+47, 48, 49, 56, 60, 61, 62, 65, 67, 68, 70, 72, 73, 76, 77, 79, 80, 82,
+84, 88, 89, 91, 92, 93, 94, 95, 96, 97.
+
+### Coverage report (Block 6)
+
+| | Old (2017 snapshot) | New (TAG-2026) |
+|---|---|---|
+| Trains | 11,112 | **2,056** |
+| Route stops | 186,102 | **16,419** |
+| Running-day records | 0 | **2,056** (1,801 `confirmed`, 255 `unknown`) |
+| Stations | 8,148 | 8,173 (+28, additive only - see below) |
+
+The train count dropping is **expected, not a regression**: TAG has
+always been the official *Mail/Express and premium-service* national
+timetable - it does not cover the thousands of zone-local
+EMU/MEMU/passenger services the 2017 CSV mirror's own (different,
+broader-scope) source included. This dataset is narrower in scope but
+far more current for the services it does cover; see item 19 of the
+task this block answers - no number was fabricated or padded toward
+either the old total or any other target.
+
+Of the 2,406 ground-truth numbers: **2,056 resolved** to a real route,
+**350 unresolved** - 193 only referenced one of the 31
+unsupported-layout tables, 150 were not found in any successfully
+parsed table (a real gap: either the table exists but that specific
+train's column wasn't recoverable, or its indexed table reference was
+itself unparseable), 7 had no usable name in either index (a real
+index-parsing gap, e.g. cross-page contamination left a stray date
+string in a name field) - never fabricated a name to keep them.
+
+**722 station names** encountered in the tables didn't match an
+existing station (in `stations.csv` or `Station_Code_Index.pdf`) after
+normalization - those specific stops are dropped from that train's
+route (never guessed), which is the main reason some real trains'
+recorded routes end short of their true terminus (see "Known
+limitations" below). **28 new stations** were added, purely additively
+- no existing station row was edited, matching the requirement to
+leave the station dataset alone unless proven wrong.
+
+**21 of 2,056 trains (~1%)** have an implausible `day_offset` (>3
+days) - a signal the deterministic time-ordering heuristic hit a real
+upstream parsing issue for that specific train, surfaced in the report
+rather than silently accepted.
+
+Full detail (every unresolved train, every unmatched station name,
+every name conflict) is in
+`build_data/tag2026_final/data_quality_report.json` (gitignored,
+reproducible - see "Reproducing this dataset" below).
+
+### Known limitations (Block 6, read before trusting a specific train's full route)
+
+- **Not every route reaches its real terminus.** A route is recorded up
+  to the last stop this pass's extraction could confirm a station code
+  for; if a later stop's name didn't match (see the 722 count above) or
+  the table page containing the final leg has a page-layout complexity
+  this pass's parser doesn't fully resolve (verified case: 12301's
+  route ends at Ghaziabad Jn., not New Delhi - a real, page-specific
+  gap, not a fabricated shorter route), the recorded route is honestly
+  shorter than the real one rather than guessed to completion.
+- **The 31 unsupported-layout tables are entirely excluded** (see
+  above) - their trains are neither in this dataset nor fabricated.
+- **`category`/`paired_train_number` are best-effort.** `category`
+  comes from simple membership in a named-category PDF's own text: a
+  train that TAG doesn't explicitly categorize is `regular`, which
+  includes ordinary Mail/Express services correctly but could also
+  mean a real special/seasonal service this pass didn't detect as such.
+- Everything Sources 1-4 above already documented about the *station*
+  dataset (2016-2017 geography/state-enrichment vintage) is unchanged -
+  Block 6 did not touch station rows except the 28 additions.
+
+### Emulator / Where Is My Train validation
+
+See `docs/DATA_VALIDATION_2026.md` for the validation matrix and
+emulator verification results.
+
+### Reproducing this dataset
+
+```bash
+cd scripts/tag2026 && python -m venv .venv && .venv/Scripts/pip install pdfplumber requests
+.venv/Scripts/python fetch_tag2026.py --output ../../raw_data/tag2026
+.venv/Scripts/python parse_indexes.py --input ../../raw_data/tag2026 --output ../../build_data/tag2026
+.venv/Scripts/python parse_station_codes.py --input ../../raw_data/tag2026/Station_Code_Index.pdf --output ../../build_data/tag2026/station_codes.json
+.venv/Scripts/python batch_parse_tables.py  # writes build_data/tag2026/tables/*.json
+.venv/Scripts/python reconcile.py --tag-dir ../../build_data/tag2026 --raw-tag-dir ../../raw_data/tag2026 \
+  --existing-stations ../../build_data/stations.csv --output ../../build_data/tag2026_final
+cd ../..
+cat build_data/stations.csv build_data/tag2026_final/stations_new.csv | tail -n +1 > build_data/tag2026_final/stations_merged.csv  # keep exactly one header
+dart run bin/import_railway_data.dart \
+  --stations build_data/tag2026_final/stations_merged.csv \
+  --trains build_data/tag2026_final/trains.csv \
+  --route-stops build_data/tag2026_final/route_stops.csv \
+  --running-days build_data/tag2026_final/running_days.csv \
+  --output assets/database/railway.db \
+  --source "Indian Railways Railway Board - Trains at a Glance 2026 (TAG-2026), effective 1 Jan 2026" \
+  --source-version "TAG-2026, effective 2026-01-01"
+```
+
+`raw_data/tag2026/`, `build_data/tag2026*/` are gitignored (reproducible
+from source, like every other `raw_data`/`build_data` path in this
+project); `scripts/tag2026/*.py` and the resulting
+`assets/database/railway.db` are committed.

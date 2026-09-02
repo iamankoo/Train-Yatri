@@ -53,3 +53,9 @@ app.*.map.json
 # assets/database/railway.db (the built result) IS committed.
 /raw_data/
 /build_data/
+
+# Python venv/cache for scripts/tag2026/ (Block 6 2026-dataset extraction,
+# dev-time only - never shipped, see docs/RAILWAY_DATABASE.md)
+/scripts/tag2026/.venv/
+__pycache__/
+*.pyc

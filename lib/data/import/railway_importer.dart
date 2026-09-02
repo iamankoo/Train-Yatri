@@ -129,6 +129,9 @@ class RailwayImporter {
           continue;
         }
 
+        final category = row['category'];
+        final pairedTrainNumber = row['paired_train_number'];
+
         final trainId = await txn.insert('trains', {
           'number': number,
           'name': name,
@@ -136,6 +139,11 @@ class RailwayImporter {
           'normalized_name': RailwayNormalization.normalizeName(name),
           'is_active': (isActive ?? true) ? 1 : 0,
           'confidence': 'unknown',
+          'category': (category == null || category.isEmpty) ? null : category,
+          'paired_train_number':
+              (pairedTrainNumber == null || pairedTrainNumber.isEmpty)
+              ? null
+              : pairedTrainNumber,
         });
         trainIdByNormalizedNumber[normalizedNumber] = trainId;
       }

@@ -3,9 +3,18 @@
 /// [schemaVersion] identifies *this structure* - bump it whenever a
 /// migration-worthy change is made to the DDL below. It is intentionally
 /// separate from the railway dataset's own version (see
-/// `DatasetMetadata.datasetVersion`): the tables can stay on schema
-/// version 1 across many different dataset imports/updates.
-const int schemaVersion = 1;
+/// `DatasetMetadata.datasetVersion`): the tables can stay on the same
+/// schema version across many different dataset imports/updates.
+///
+/// Bumped 1 -> 2 for Block 6's 2026 dataset replacement: `trains` gained
+/// `category` ('regular'/'named_premium'/'tod_special', null when the
+/// source doesn't distinguish) and `paired_train_number` (the other
+/// direction's number, when the source states a pairing) - both
+/// nullable and additive, but a schema version bump is still required
+/// so `RailwayDatabase.open()` re-copies the bundled asset for existing
+/// installs rather than keeping a stale on-disk copy missing the
+/// columns (see docs/RAILWAY_DATABASE.md "Database versioning").
+const int schemaVersion = 2;
 
 /// Executed in order against a fresh database file to create the full
 /// railway schema. Idempotent (`IF NOT EXISTS`) so it is also safe to
@@ -46,7 +55,9 @@ const List<String> schemaStatements = [
     normalized_number TEXT NOT NULL,
     normalized_name TEXT NOT NULL,
     is_active INTEGER NOT NULL DEFAULT 1,
-    confidence TEXT NOT NULL DEFAULT 'unknown'
+    confidence TEXT NOT NULL DEFAULT 'unknown',
+    category TEXT,
+    paired_train_number TEXT
   )
   ''',
   'CREATE UNIQUE INDEX IF NOT EXISTS idx_trains_normalized_number ON trains(normalized_number)',

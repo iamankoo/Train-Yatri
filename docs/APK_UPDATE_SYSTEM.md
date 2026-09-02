@@ -69,7 +69,8 @@ never gets suggested.
 Block 4 (v0.1.0-v0.4.0) shipped three ABI-specific APKs per release and
 had the client pick one by `Abi.current()`. **From v0.5.0 on, every
 release publishes exactly one universal APK** -
-`train-yatri-vX.Y.Z.apk`, built via plain `flutter build apk --release`
+`train-yatri-vX.Y.Z.apk`, built via
+`flutter build apk --release --target-platform android-arm,android-arm64`
 (no `--split-per-abi`) - installable on any supported Android device.
 `lib/core/update/apk_asset_selector.dart` simply picks the one asset
 matching that exact filename pattern; there is no ABI detection left to
@@ -78,6 +79,18 @@ published (GitHub Releases are a permanent historical archive - old
 assets are never deleted), but the update checker only ever looks at
 the *latest* release, which from v0.5.0 on always has just this one
 asset.
+
+**Why `--target-platform` is required (added Block 6):** a plain
+`flutter build apk --release` with no target-platform restriction
+bundles *every* ABI Flutter supports, including `x86_64` - which no
+real end-user Android phone/tablet uses (it exists only for emulators
+and some Chromebooks) and alone adds ~19 MB of native libraries,
+pushing the single APK over this project's 55 MB hard limit (verified:
+61.7 MB unrestricted vs. ~39-41 MB restricted to the two ABIs that
+cover real Android hardware). A `android { defaultConfig { ndk {
+abiFilters ... } } }` block in `android/app/build.gradle.kts` was tried
+first and had no effect on the built APK's contents - the CLI flag is
+the one that actually works.
 
 ## Download, validation and retry (C3)
 
