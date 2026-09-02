@@ -1,8 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/providers/railway_providers.dart';
+import '../../data/providers/running_days_lookup_providers.dart';
+import '../../domain/entities/direct_service.dart';
 import '../../domain/entities/station.dart';
+import '../../domain/repositories/running_days_lookup_repository.dart';
 import '../../domain/services/journey_discovery_service.dart';
 import '../../shared/theme/app_colors.dart';
 import '../../shared/theme/app_spacing.dart';
@@ -41,6 +46,13 @@ class SearchResultsScreen extends ConsumerStatefulWidget {
 class _SearchResultsScreenState extends ConsumerState<SearchResultsScreen> {
   late Future<JourneyDiscoveryResult> _future;
 
+  /// Populated after direct results load, via a best-effort background
+  /// call to the backend's progressive running-days lookup (see
+  /// `docs/RUNNING_DAYS_BACKFILL.md`). Never blocks or delays the
+  /// offline search itself - starts empty, and `_ResultsList` shows a
+  /// single unsplit "Direct" section until (if ever) this fills in.
+  Map<String, RunningDaysAnswer> _runningDaysAnswers = {};
+
   @override
   void initState() {
     super.initState();
@@ -49,14 +61,31 @@ class _SearchResultsScreenState extends ConsumerState<SearchResultsScreen> {
 
   Future<JourneyDiscoveryResult> _search() async {
     final repository = await ref.read(railwayRepositoryProvider.future);
-    return JourneyDiscoveryService.discover(
+    final result = await JourneyDiscoveryService.discover(
       repository: repository,
       fromStationId: widget.from.stationId,
       toStationId: widget.to.stationId,
     );
+    if (result.direct.isNotEmpty) {
+      unawaited(_loadRunningDays(result.direct));
+    }
+    return result;
   }
 
-  void _retry() => setState(() => _future = _search());
+  Future<void> _loadRunningDays(List<DirectService> direct) async {
+    final numbers = {
+      for (final service in direct) service.train.number,
+    }.toList();
+    final lookupRepository = ref.read(runningDaysLookupRepositoryProvider);
+    final answers = await lookupRepository.getRunningDays(numbers);
+    if (!mounted || answers.isEmpty) return;
+    setState(() => _runningDaysAnswers = answers);
+  }
+
+  void _retry() => setState(() {
+    _runningDaysAnswers = {};
+    _future = _search();
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -85,7 +114,11 @@ class _SearchResultsScreenState extends ConsumerState<SearchResultsScreen> {
                       message: 'No journey found',
                     );
                   }
-                  return _ResultsList(result: result);
+                  return _ResultsList(
+                    result: result,
+                    date: widget.date,
+                    runningDaysAnswers: _runningDaysAnswers,
+                  );
                 },
               ),
             ),
@@ -97,14 +130,37 @@ class _SearchResultsScreenState extends ConsumerState<SearchResultsScreen> {
 }
 
 class _ResultsList extends StatelessWidget {
-  const _ResultsList({required this.result});
+  const _ResultsList({
+    required this.result,
+    required this.date,
+    required this.runningDaysAnswers,
+  });
 
   final JourneyDiscoveryResult result;
+  final DateTime date;
+  final Map<String, RunningDaysAnswer> runningDaysAnswers;
+
+  /// Direct services RailRadar has confirmed actually run on [date]'s
+  /// weekday - shown first, ahead of the complete list below, per the
+  /// product requirement that a search surface likely-relevant trains
+  /// before the full unfiltered list. Empty (and therefore invisible)
+  /// until the backend's progressive lookup has confirmed at least one
+  /// - this never removes or reorders the complete list underneath it.
+  List<DirectService> get _runningOnDate => [
+    for (final service in result.direct)
+      if (runningDaysAnswers[service.train.number]?.status ==
+              RunningDaysLookupStatus.confirmed &&
+          runningDaysAnswers[service.train.number]!.operatesOnWeekday(
+            date.weekday,
+          ))
+        service,
+  ];
 
   @override
   Widget build(BuildContext context) {
     final hasDirect = result.direct.isNotEmpty;
     final hasConnecting = result.connecting.isNotEmpty;
+    final runningOnDate = _runningOnDate;
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(
@@ -115,7 +171,17 @@ class _ResultsList extends StatelessWidget {
       ),
       children: [
         if (hasDirect) ...[
-          const SectionTitle(title: 'Direct'),
+          if (runningOnDate.isNotEmpty) ...[
+            SectionTitle(title: 'Running on ${DateFormatter.shortDate(date)}'),
+            const SizedBox(height: AppSpacing.sm),
+            for (final service in runningOnDate) ...[
+              TrainResultCard(service: service),
+              const SizedBox(height: AppSpacing.sm),
+            ],
+            const SizedBox(height: AppSpacing.md),
+            const SectionTitle(title: 'All Direct Trains'),
+          ] else
+            const SectionTitle(title: 'Direct'),
           const SizedBox(height: AppSpacing.sm),
           for (final service in result.direct) ...[
             TrainResultCard(service: service),
