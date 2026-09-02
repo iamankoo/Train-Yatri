@@ -1,0 +1,8 @@
+.env
+.env.*
+!.env.example
+node_modules/
+
+# Runtime-accumulated data (the progressively-learned running-days
+# cache, see src/lib/runningDaysCache.js) - not source, never committed.
+data/

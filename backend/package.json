@@ -1,0 +1,17 @@
+{
+  "name": "train-yatri-backend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The only thing standing between the Flutter app and the RailRadar API key (Block 6) - normalizes real live-train-status responses, never simulates one.",
+  "engines": {
+    "node": ">=20.6.0"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --env-file=.env --watch src/server.js",
+    "test": "node --test"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}

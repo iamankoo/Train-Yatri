@@ -1,0 +1,27 @@
+# Render Blueprint (https://render.com/docs/blueprint-spec) - lets
+# iamankoo deploy this backend by connecting the GitHub repo in the
+# Render dashboard and choosing "New > Blueprint". Render supplies
+# PORT automatically; RAILRADAR_API_KEY is deliberately `sync: false`
+# so it must be entered once by hand in the Render dashboard (Environment
+# tab) rather than ever living in this file or the repo - see
+# docs/LIVE_STATUS.md "Deployment" for the exact steps.
+services:
+  - type: web
+    name: train-yatri-backend
+    runtime: node
+    plan: free
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: RAILRADAR_BASE_URL
+        value: https://api.railradar.in
+      - key: LIVE_STATUS_CACHE_TTL_MS
+        value: 25000
+      - key: RAILRADAR_REQUEST_TIMEOUT_MS
+        value: 8000
+      - key: RAILRADAR_API_KEY
+        sync: false
