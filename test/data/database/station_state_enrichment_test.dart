@@ -9,7 +9,6 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:sqflite_common/sqlite_api.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:train_yatri/data/database/railway_database.dart';
 import 'package:train_yatri/data/repositories/sqlite_railway_repository.dart';
@@ -47,87 +46,75 @@ void main() {
       if (scratch.existsSync()) scratch.deleteSync(recursive: true);
     });
 
-    test(
-      'CYI (Chhayapuri) resolves to Gujarat - the case Block 4 was asked '
-      'to explicitly verify',
-      () async {
-        if (!dbExists) return markTestSkipped('railway.db not built');
+    test('CYI (Chhayapuri) resolves to Gujarat - the case Block 4 was asked '
+        'to explicitly verify', () async {
+      if (!dbExists) return markTestSkipped('railway.db not built');
 
-        final station = await repository.getStationByCode('CYI');
-        expect(station, isNotNull);
-        expect(station!.name, 'CHHAYAPURI');
-        expect(station.state, 'Gujarat');
-      },
-    );
+      final station = await repository.getStationByCode('CYI');
+      expect(station, isNotNull);
+      expect(station!.name, 'CHHAYAPURI');
+      expect(station.state, 'Gujarat');
+    });
 
-    test(
-      'a representative sample of previously-missing stations now has a '
-      'state, each one of the 36 canonical Indian state/UT names',
-      () async {
-        if (!dbExists) return markTestSkipped('railway.db not built');
+    test('a representative sample of previously-missing stations now has a '
+        'state, each one of the 36 canonical Indian state/UT names', () async {
+      if (!dbExists) return markTestSkipped('railway.db not built');
 
-        // Every one of these had state: null before Block 4 (see
-        // docs/RAILWAY_DATABASE.md); each is now resolved by the
-        // geometric enrichment source.
-        const sampleCodes = ['CYI', 'BCOB', 'DARA', 'NRZB', 'RF'];
-        for (final code in sampleCodes) {
-          final station = await repository.getStationByCode(code);
-          expect(station, isNotNull, reason: '$code should exist');
-          expect(
-            station!.state,
-            isNotNull,
-            reason: '$code should have a state after Block 4 enrichment',
-          );
-          expect(station.state, isNotEmpty);
-        }
-      },
-    );
-
-    test(
-      'a genuinely unresolved station (no coordinate in any legitimate '
-      'source) still honestly has no state - not guessed',
-      () async {
-        if (!dbExists) return markTestSkipped('railway.db not built');
-
-        // ACOI (CHHEOKI) has no coordinate in the datameet source and so
-        // cannot be geometrically resolved - see
-        // data/enrichment/unresolved_stations.csv. It must stay null,
-        // never a fabricated value.
-        final station = await repository.getStationByCode('ACOI');
-        expect(station, isNotNull);
-        expect(station!.state, isNull);
-      },
-    );
-
-    test(
-      'no state value in the database is outside the 36 canonical '
-      'Indian state/union-territory names (no typos, no stale names '
-      'like "Orissa", no casing drift)',
-      () async {
-        if (!dbExists) return markTestSkipped('railway.db not built');
-
-        const canonical = {
-          'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar',
-          'Chhattisgarh', 'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh',
-          'Jharkhand', 'Karnataka', 'Kerala', 'Madhya Pradesh',
-          'Maharashtra', 'Manipur', 'Meghalaya', 'Mizoram', 'Nagaland',
-          'Odisha', 'Punjab', 'Rajasthan', 'Sikkim', 'Tamil Nadu',
-          'Telangana', 'Tripura', 'Uttar Pradesh', 'Uttarakhand',
-          'West Bengal', 'Andaman and Nicobar Islands', 'Chandigarh',
-          'Dadra and Nagar Haveli and Daman and Diu', 'Delhi',
-          'Jammu and Kashmir', 'Ladakh', 'Lakshadweep', 'Puducherry',
-          //
-        };
-
-        final rows = await db.query(
-          'stations',
-          distinct: true,
-          columns: ['state'],
-          where: "state IS NOT NULL AND state != ''",
+      // Every one of these had state: null before Block 4 (see
+      // docs/RAILWAY_DATABASE.md); each is now resolved by the
+      // geometric enrichment source.
+      const sampleCodes = ['CYI', 'BCOB', 'DARA', 'NRZB', 'RF'];
+      for (final code in sampleCodes) {
+        final station = await repository.getStationByCode(code);
+        expect(station, isNotNull, reason: '$code should exist');
+        expect(
+          station!.state,
+          isNotNull,
+          reason: '$code should have a state after Block 4 enrichment',
         );
-        final actual = rows.map((r) => r['state'] as String).toSet();
-        expect(actual.difference(canonical), isEmpty);
-      },
-    );
+        expect(station.state, isNotEmpty);
+      }
+    });
+
+    test('a genuinely unresolved station (no coordinate in any legitimate '
+        'source) still honestly has no state - not guessed', () async {
+      if (!dbExists) return markTestSkipped('railway.db not built');
+
+      // ACOI (CHHEOKI) has no coordinate in the datameet source and so
+      // cannot be geometrically resolved - see
+      // data/enrichment/unresolved_stations.csv. It must stay null,
+      // never a fabricated value.
+      final station = await repository.getStationByCode('ACOI');
+      expect(station, isNotNull);
+      expect(station!.state, isNull);
+    });
+
+    test('no state value in the database is outside the 36 canonical '
+        'Indian state/union-territory names (no typos, no stale names '
+        'like "Orissa", no casing drift)', () async {
+      if (!dbExists) return markTestSkipped('railway.db not built');
+
+      const canonical = {
+        'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar',
+        'Chhattisgarh', 'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh',
+        'Jharkhand', 'Karnataka', 'Kerala', 'Madhya Pradesh',
+        'Maharashtra', 'Manipur', 'Meghalaya', 'Mizoram', 'Nagaland',
+        'Odisha', 'Punjab', 'Rajasthan', 'Sikkim', 'Tamil Nadu',
+        'Telangana', 'Tripura', 'Uttar Pradesh', 'Uttarakhand',
+        'West Bengal', 'Andaman and Nicobar Islands', 'Chandigarh',
+        'Dadra and Nagar Haveli and Daman and Diu', 'Delhi',
+        'Jammu and Kashmir', 'Ladakh', 'Lakshadweep', 'Puducherry',
+        //
+      };
+
+      final rows = await db.query(
+        'stations',
+        distinct: true,
+        columns: ['state'],
+        where: "state IS NOT NULL AND state != ''",
+      );
+      final actual = rows.map((r) => r['state'] as String).toSet();
+      expect(actual.difference(canonical), isEmpty);
+    });
   });
 }

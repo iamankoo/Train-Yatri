@@ -156,6 +156,38 @@ void main() {
     });
   });
 
+  group('getRouteWithStations', () {
+    test(
+      'returns each stop paired with its own station, ordered by stop_sequence',
+      () async {
+        final trainId = (await repository.getTrainByNumber('00101T'))!.trainId;
+        final route = await repository.getRouteWithStations(trainId);
+
+        expect(route.map((r) => r.stop.stopSequence), [1, 2, 3]);
+        expect(route.map((r) => r.station.code), ['NDA', 'JXN', 'MCB']);
+      },
+    );
+
+    test(
+      'day_offset still correctly orders the overnight stop, same as getRoute',
+      () async {
+        final trainId = (await repository.getTrainByNumber('00101T'))!.trainId;
+        final route = await repository.getRouteWithStations(trainId);
+
+        expect(route.first.stop.isOrigin, isTrue);
+        expect(route.last.stop.isTerminus, isTrue);
+        expect(
+          route.last.stop.dayOffset,
+          greaterThan(route.first.stop.dayOffset),
+        );
+      },
+    );
+
+    test('empty list for a train with no recorded route', () async {
+      expect(await repository.getRouteWithStations(999999), isEmpty);
+    });
+  });
+
   group('getTrainsAtStation', () {
     test('finds every train that stops at a station', () async {
       final station = (await repository.getStationByCode('MCB'))!;

@@ -4,8 +4,8 @@ import '../../../domain/entities/direct_service.dart';
 import '../../../shared/theme/app_colors.dart';
 import '../../../shared/theme/app_spacing.dart';
 import '../../../shared/theme/app_text_styles.dart';
-import '../../../shared/utils/coming_soon.dart';
 import '../../../shared/widgets/train_yatri_card.dart';
+import '../../train_details/train_details_screen.dart';
 
 /// One matching train for a From/To search. Shows only what the static
 /// timetable actually provides for this specific pair of stops -
@@ -34,7 +34,9 @@ class TrainResultCard extends StatelessWidget {
       child: TrainYatriCard(
         padding: const EdgeInsets.all(AppSpacing.md),
         child: InkWell(
-          onTap: () => showComingSoon(context, 'Train details'),
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => TrainDetailsScreen(train: train)),
+          ),
           borderRadius: BorderRadius.circular(AppRadius.md),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,

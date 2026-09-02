@@ -1,6 +1,7 @@
 import '../entities/dataset_metadata.dart';
 import '../entities/direct_service.dart';
 import '../entities/route_stop.dart';
+import '../entities/route_stop_with_station.dart';
 import '../entities/running_days.dart';
 import '../entities/station.dart';
 import '../entities/train_service.dart';
@@ -32,6 +33,13 @@ abstract interface class RailwayRepository {
   /// The full route of [trainId], ordered by stop sequence. Empty list
   /// if the train has no route stops recorded.
   Future<List<RouteStop>> getRoute(int trainId);
+
+  /// [getRoute], with each stop's [Station] already joined in - for the
+  /// Train Details route timeline, which needs every stop's station
+  /// name/code and would otherwise cost one extra lookup per stop on a
+  /// route that can have 50+ of them. Same ordering/emptiness contract
+  /// as [getRoute].
+  Future<List<RouteStopWithStation>> getRouteWithStations(int trainId);
 
   /// Trains that stop at [stationId], most-relevant/likely first as
   /// defined by the implementation. Returns at most [limit] results.

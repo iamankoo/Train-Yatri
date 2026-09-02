@@ -105,6 +105,43 @@ void main() {
       );
     });
 
+    test('getRouteWithStations(12301) - Block 4\'s Train Details data source '
+        '- carries real station names through the join and preserves the '
+        'same overnight day_offset crossing as getRoute', () async {
+      if (!dbExists) return markTestSkipped('railway.db not built');
+      final train = (await repository.getTrainByNumber('12301'))!;
+      final route = await repository.getRouteWithStations(train.trainId);
+
+      expect(route, hasLength(8));
+      expect(route.first.station.code, 'HWH');
+      expect(route.last.station.code, 'NDLS');
+
+      final gaya = route[3];
+      final mgs = route[4];
+      expect(gaya.station.code, 'GAYA');
+      expect(mgs.station.code, 'MGS');
+      expect(gaya.stop.dayOffset, 0);
+      expect(mgs.stop.dayOffset, 1);
+    });
+
+    test('getRouteWithStations(12951) - the Mumbai Rajdhani, another real '
+        'overnight train - crosses from day 0 to day 1 at Ratlam Jn', () async {
+      if (!dbExists) return markTestSkipped('railway.db not built');
+      final train = (await repository.getTrainByNumber('12951'))!;
+      final route = await repository.getRouteWithStations(train.trainId);
+
+      expect(route, hasLength(8));
+      expect(route.first.station.code, 'BCT');
+      expect(route.last.station.code, 'NDLS');
+
+      final vadodara = route[3];
+      final ratlam = route[4];
+      expect(vadodara.station.code, 'BRC');
+      expect(ratlam.station.code, 'RTM');
+      expect(vadodara.stop.dayOffset, 0);
+      expect(ratlam.stop.dayOffset, 1);
+    });
+
     test(
       'getRunningDays is honestly null - no calendar source was found',
       () async {

@@ -5,6 +5,7 @@ import '../../domain/entities/dataset_metadata.dart';
 import '../../domain/entities/direct_service.dart';
 import '../../domain/entities/railway_time.dart';
 import '../../domain/entities/route_stop.dart';
+import '../../domain/entities/route_stop_with_station.dart';
 import '../../domain/entities/running_days.dart';
 import '../../domain/entities/station.dart';
 import '../../domain/entities/train_service.dart';
@@ -92,6 +93,36 @@ class SqliteRailwayRepository implements RailwayRepository {
       orderBy: 'stop_sequence',
     );
     return rows.map(_routeStopFromRow).toList();
+  }
+
+  @override
+  Future<List<RouteStopWithStation>> getRouteWithStations(int trainId) async {
+    final rows = await db.rawQuery(
+      '''
+      SELECT rs.*, s.station_id AS s_station_id, s.code AS s_code,
+        s.name AS s_name, s.city AS s_city, s.state AS s_state,
+        s.latitude AS s_latitude, s.longitude AS s_longitude
+      FROM route_stops rs
+      JOIN stations s ON s.station_id = rs.station_id
+      WHERE rs.train_id = ?
+      ORDER BY rs.stop_sequence
+      ''',
+      [trainId],
+    );
+    return rows.map((row) {
+      return RouteStopWithStation(
+        stop: _routeStopFromRow(row),
+        station: Station(
+          stationId: row['s_station_id'] as int,
+          code: row['s_code'] as String,
+          name: row['s_name'] as String,
+          city: row['s_city'] as String?,
+          state: row['s_state'] as String?,
+          latitude: row['s_latitude'] as double?,
+          longitude: row['s_longitude'] as double?,
+        ),
+      );
+    }).toList();
   }
 
   @override
