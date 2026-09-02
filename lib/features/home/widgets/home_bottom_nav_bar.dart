@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../shared/theme/app_colors.dart';
 import '../../../shared/theme/app_text_styles.dart';
 import '../../../shared/utils/coming_soon.dart';
+import '../../profile/profile_screen.dart';
 
 class _NavItem {
   const _NavItem(this.label, this.icon);
@@ -12,12 +13,14 @@ class _NavItem {
 
 /// Bottom navigation shell.
 ///
-/// Only "Home" is a real, built destination in Block 1. Live (Block 6/7),
-/// Journeys (Block 3/9) and Profile (Block 8/9) are the product's
-/// planned feature areas and are presented as visibly *inactive* -
-/// tapping them gives honest "coming soon" feedback rather than
-/// navigating to an empty screen or implying functionality that isn't
-/// there yet.
+/// "Home" is a real, built destination since Block 1. Live (Block 6/7)
+/// and Journeys (Block 3/9) remain the product's planned feature areas
+/// and are presented as visibly *inactive* - tapping them gives honest
+/// "coming soon" feedback rather than navigating to an empty screen or
+/// implying functionality that isn't there yet. "Profile" now opens a
+/// deliberately minimal screen (Block 4, C8: only the update-check
+/// surface) - the full Profile feature itself is still Block 8/9's
+/// scope.
 class HomeBottomNavBar extends StatelessWidget {
   const HomeBottomNavBar({super.key});
 
@@ -48,6 +51,12 @@ class HomeBottomNavBar extends StatelessWidget {
                     selected: item == _items.first,
                     onTap: item == _items.first
                         ? null
+                        : item.label == 'Profile'
+                        ? () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const ProfileScreen(),
+                            ),
+                          )
                         : () => showComingSoon(context, item.label),
                   ),
                 ),

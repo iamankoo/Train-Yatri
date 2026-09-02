@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/update/update_info.dart';
+import '../../data/providers/update_providers.dart';
 import '../../shared/theme/app_spacing.dart';
+import '../update/widgets/update_available_dialog.dart';
+import '../update/widgets/update_download_dialog.dart';
 import 'widgets/brand_header.dart';
 import 'widgets/hero_banner.dart';
 import 'widgets/home_bottom_nav_bar.dart';
@@ -13,15 +18,23 @@ import 'widgets/recent_searches_section.dart';
 /// to match the supplied `assets/mainpage.png` reference: brand header,
 /// From/To/Date search card, quick actions, recent searches, bottom nav.
 ///
-/// No railway data, search, or backend calls happen here yet; that is
-/// intentionally out of scope for Block 1 (see AGENT/task notes -
-/// Blocks 2-9 wire up the database, search, live status, ratings, PNR
-/// and booking respectively).
-class HomeScreen extends StatelessWidget {
+/// Also where the Block 4 update check (C1) surfaces: `updateCheckProvider`
+/// runs in the background (never blocking this screen's own build/first
+/// frame) and, the first time it resolves with a real update this
+/// session, shows the update-available dialog.
+class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    ref.listen<AsyncValue<UpdateInfo?>>(updateCheckProvider, (previous, next) {
+      final info = next.valueOrNull;
+      if (info == null) return;
+      if (ref.read(updateDialogShownProvider)) return;
+      ref.read(updateDialogShownProvider.notifier).state = true;
+      _promptUpdate(context, info);
+    });
+
     return Scaffold(
       body: SafeArea(
         child: ListView(
@@ -48,5 +61,13 @@ class HomeScreen extends StatelessWidget {
       ),
       bottomNavigationBar: const HomeBottomNavBar(),
     );
+  }
+
+  Future<void> _promptUpdate(BuildContext context, UpdateInfo info) async {
+    if (!context.mounted) return;
+    final wantsUpdate = await showUpdateAvailableDialog(context, info);
+    if (wantsUpdate == true && context.mounted) {
+      await startUpdateDownloadFlow(context, info);
+    }
   }
 }

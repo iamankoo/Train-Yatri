@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Exposes only the app's own cache directory - where
+     lib/core/update/apk_downloader.dart writes a downloaded update APK
+     (path_provider's getTemporaryDirectory(), which is
+     Context.getCacheDir() on Android) - to the FileProvider used by
+     android/app/.../MainActivity.kt's installApk handler. Nothing else
+     on the device is exposed. -->
+<paths>
+    <cache-path name="update_apk" path="." />
+</paths>

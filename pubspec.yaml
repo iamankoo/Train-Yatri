@@ -57,6 +57,27 @@ dependencies:
   # small, separate key-value store is the right tool for "a short list
   # of lightweight records, no relational queries needed."
   shared_preferences: ^2.3.3
+  # Reads the installed app's own version (versionName) for the GitHub
+  # Release update check (Block 4) - the one honest source of "what am
+  # I currently running", instead of hand-duplicating this pubspec's
+  # version as a second Dart constant that could drift from it.
+  package_info_plus: ^10.2.1
+
+  # Locates a writable, app-private directory to download an update APK
+  # into (Block 4) before handing it to Android's package installer.
+  # Deliberately NOT paired with a plugin for the installer handoff
+  # itself (e.g. open_filex) - that step is a ~30-line platform channel
+  # in android/app/.../MainActivity.kt instead, since open_filex's
+  # current Android implementation pulls in a `jni`/`objective_c`
+  # dependency chain for a single "open this file" call, which is not
+  # worth the extra footprint against the project's 55 MB budget (see
+  # docs/APK_UPDATE_SYSTEM.md).
+  path_provider: ^2.1.6
+
+  # SHA-256 verification of a downloaded update APK (Block 4, C5)
+  # against the checksum published alongside each GitHub Release.
+  # Pure-Dart, no native footprint.
+  crypto: ^3.0.7
 
 dev_dependencies:
   flutter_test:
