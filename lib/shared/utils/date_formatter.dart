@@ -32,4 +32,17 @@ abstract final class DateFormatter {
     final minute = dateTime.minute.toString().padLeft(2, '0');
     return '$hour:$minute';
   }
+
+  /// "YYYY-MM-DD" - the exact format the Train Yatri backend (and
+  /// RailRadar itself) expects for a journey date
+  /// (`validateJourneyDate` on the backend). Uses [date]'s own
+  /// year/month/day only - never the current time - so passing a
+  /// user-selected journey date always asks Live Status about that
+  /// specific date, not "now".
+  static String isoDate(DateTime date) {
+    final year = date.year.toString().padLeft(4, '0');
+    final month = date.month.toString().padLeft(2, '0');
+    final day = date.day.toString().padLeft(2, '0');
+    return '$year-$month-$day';
+  }
 }

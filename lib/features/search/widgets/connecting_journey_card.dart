@@ -19,9 +19,17 @@ import '../../train_details/train_details_screen.dart';
 /// Block 4 Train Details screen for that leg's own train (Block 5,
 /// "Train Details Integration": reuse, never duplicate, that screen).
 class ConnectingJourneyCard extends StatelessWidget {
-  const ConnectingJourneyCard({required this.journey, super.key});
+  const ConnectingJourneyCard({
+    required this.journey,
+    required this.date,
+    super.key,
+  });
 
   final ConnectingJourney journey;
+
+  /// The searched journey date - threaded to each leg's Train Details
+  /// so an automatic Live Status check asks about this exact date.
+  final DateTime date;
 
   @override
   Widget build(BuildContext context) {
@@ -30,7 +38,7 @@ class ConnectingJourneyCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _LegRow(leg: journey.legA),
+          _LegRow(leg: journey.legA, date: date),
           const SizedBox(height: AppSpacing.sm),
           _ChangeAtRow(
             stationName: journey.interchange.name,
@@ -38,7 +46,7 @@ class ConnectingJourneyCard extends StatelessWidget {
             waitingDuration: journey.waitingDuration,
           ),
           const SizedBox(height: AppSpacing.sm),
-          _LegRow(leg: journey.legB),
+          _LegRow(leg: journey.legB, date: date),
           const Padding(
             padding: EdgeInsets.symmetric(vertical: AppSpacing.sm),
             child: Divider(height: 1),
@@ -58,9 +66,10 @@ class ConnectingJourneyCard extends StatelessWidget {
 }
 
 class _LegRow extends StatelessWidget {
-  const _LegRow({required this.leg});
+  const _LegRow({required this.leg, required this.date});
 
   final DirectService leg;
+  final DateTime date;
 
   @override
   Widget build(BuildContext context) {
@@ -77,7 +86,9 @@ class _LegRow extends StatelessWidget {
           '${arrival != null ? ' Arrives ${arrival.toDbString()}${overnight ? ' next day' : ''}.' : ''}',
       child: InkWell(
         onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => TrainDetailsScreen(train: train)),
+          MaterialPageRoute(
+            builder: (_) => TrainDetailsScreen(train: train, journeyDate: date),
+          ),
         ),
         borderRadius: BorderRadius.circular(AppRadius.sm),
         child: Padding(

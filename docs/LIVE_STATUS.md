@@ -170,21 +170,26 @@ is a Render free-tier characteristic, not a bug in this backend.
   data, marked stale, rather than blanking to an error.
 - `lib/features/live_tracking/live_tab_screen.dart` - the Live tab's
   entry point: search a train number (client-side shape validation
-  only, `^\d{1,6}$`) or reopen a recently-viewed one.
-- `lib/features/live_tracking/live_status_screen.dart` - the display
-  screen: status, delay (omitted when unknown, never defaulted to
-  "on time"), current location, next halt, route with
-  past/current/upcoming progress (`widgets/live_route_list.dart`,
-  derived from RailRadar's own `sequence` numbers only), exception
-  banners (`widgets/live_exception_banner.dart`), pull-to-refresh, and
-  a stale-data notice.
+  only, `^\d{1,6}$`) or reopen a recently-viewed one; opens the
+  standalone `LiveStatusScreen` below.
+- `lib/features/live_tracking/live_status_screen.dart` - the standalone
+  display screen for the train-number/recent-trains entry points, and
+  `lib/features/live_tracking/widgets/live_status_body.dart` - the
+  actual status+route rendering it (and Train Details, below) both
+  share: a compact status/delay header
+  (`widgets/live_status_header_card.dart`, `widgets/live_delay_indicator.dart`)
+  and the route timeline (`widgets/live_route_timeline.dart`,
+  past/current/upcoming/between-stations derived from RailRadar's own
+  `sequence`/`isHalt`/`segmentProgress`), exception banners
+  (`widgets/live_exception_banner.dart`), pull-to-refresh, and a
+  stale-data notice - one implementation, reused, not duplicated.
 - `lib/data/repositories/shared_prefs_recent_live_trains_repository.dart` -
   lightweight local storage (train number, name, viewed-at) for
   recently-viewed lookups, mirroring `RecentSearchesRepository`. No
   live status data, credentials, or PII is ever stored.
-- Wired in from: the "Live" bottom-nav tab (`home_bottom_nav_bar.dart`),
-  the "Live Status" Quick Action (`quick_actions_section.dart`), and a
-  "Live Status" action on Train Details (`train_details_screen.dart`).
+- **Train Details (`train_details_screen.dart`) embeds Live Status
+  automatically** - see "Live Status in Train Details" below for why
+  this is not simply a button, and the full design.
 
 ### What is deliberately never shown
 
@@ -196,14 +201,69 @@ fields the provider did not report are omitted, never defaulted (no
 "0 km/h" for unknown speed, no "on time" for an unknown delay, no
 computed ETA from speed).
 
+## Live Status in Train Details
+
+Train Details (`lib/features/train_details/train_details_screen.dart`)
+does not have a "Live Status" button to discover. Instead, whenever a
+train is genuinely confirmed running on the *searched* date, its real
+live status and current position become part of the Train Details
+content automatically - the same real
+`LiveStatusController`/`LiveStatusRepository` used everywhere else, not
+a second implementation. This was a fix (not part of Block 6's
+original release): `TrainDetailsScreen` previously had no journey-date
+parameter at all, and its one "Live Status" action always asked
+RailRadar about *today*, regardless of what date the user had actually
+searched - so a From/To search for another date silently showed the
+wrong day's status, or none.
+
+`TrainDetailsScreen` now requires a real `journeyDate` (threaded from
+every entry point: `TrainResultCard`, `ConnectingJourneyCard`'s two
+legs), and on load:
+
+1. Always shows the static schedule (`RouteTimeline`) immediately -
+   Live Status never blocks the page.
+2. Asks the existing progressive `RunningDaysLookupRepository` (see
+   "Running-Days Backfill" doc) whether this train is confirmed
+   running on `journeyDate`'s weekday.
+3. **Confirmed running** - automatically starts the same
+   `LiveStatusController` every other entry point uses, with this
+   train's number and `journeyDate` formatted as `YYYY-MM-DD`
+   (`DateFormatter.isoDate`). Once live data arrives, the live header
+   and route timeline become the page's centerpiece, replacing the
+   static route (which would otherwise just duplicate it with less
+   information) - while it's loading or if it fails, the static route
+   stays visible with only a small inline strip reflecting the live
+   fetch's own state.
+4. **Confirmed *not* running** that weekday - a calm inline note
+   ("Not running on the selected date"), no live request made, static
+   route unaffected.
+5. **Unknown** (the progressive lookup hasn't learned this train yet)
+   - never assumed running; a small "Check now" inline prompt lets the
+   user ask anyway, which then behaves identically to the confirmed
+   case.
+
+### Route timeline: current position is immediately visible
+
+`widgets/live_route_timeline.dart` auto-scrolls to the train's real
+current position once, when live data first loads (never again on a
+background poll refresh, which would yank the view while someone is
+reading) - via a `GlobalKey` on the current stop (or the live segment,
+below) and `Scrollable.ensureVisible`, positioned near the top of the
+viewport rather than requiring the user to scroll through the whole
+route. When `currentLocation.isHalt` is `false` (the train is between
+two stations), a distinct "LIVE" segment card is inserted in place of
+a single stop - built only from `previousHalt`/`nextHalt`/
+`segmentProgress`/`isActualPosition`, never inventing a station
+RailRadar didn't report.
+
 ## Data boundary
 
 SQLite (`assets/database/railway.db`) is the static schedule/structure
 source (Blocks 2-5) - stations, trains, scheduled route stops. RailRadar
 via this backend is the only source of live status. The two are never
-merged into one record; Train Details (static) and Live Status (live)
-remain two separate screens reached by an explicit action, exactly as
-Block 6 requires.
+merged into one record - Train Details shows one or the other (never
+both at once for the route), and which one is showing is always
+visually unambiguous.
 
 ## Real API verification
 
@@ -240,6 +300,21 @@ gitignored `backend/.env`):
 - `test/features/live_tracking/live_status_screen_test.dart` and
   `live_tab_screen_test.dart` - UI rendering for every state, the exact
   safe error messages, omission of null fields, and navigation.
+- `test/features/train_details/train_details_screen_test.dart` - the
+  automatic-embedding logic itself: confirmed-running auto-shows Live
+  Status with no button, the exact searched date (not today) is what
+  gets asked, confirmed-not-running shows the calm note with zero live
+  requests, unknown offers the manual "Check now" fallback, a live
+  failure leaves the static route visible with an inline retry,
+  delay/on-time/unknown-delay rendering, the between-stations live
+  segment, auto-scroll (asserts real scroll offset > 0), and every
+  status (including cancelled/diverted) - plus responsive layout at
+  320/360/390/412dp in both the static and live-rendered states.
+- `test/features/search/search_results_screen_test.dart` and
+  `test/features/search/widgets/connecting_journey_card_test.dart` -
+  regression coverage for the actual reported bug: tapping a direct
+  result or either connecting-journey leg opens Train Details with the
+  exact searched date, never `DateTime.now()`.
 
 ## Known limitations
 

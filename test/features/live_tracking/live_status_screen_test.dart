@@ -55,6 +55,17 @@ Widget _wrap(Widget child, LiveStatusRepository repository) {
   );
 }
 
+/// A bounded stand-in for `pumpAndSettle()`: the live delay indicator
+/// pulses forever by design (Block 6 UI fix, Part 5), so
+/// `pumpAndSettle` never returns while one is on screen. This pumps
+/// enough frames to flush the real async fetch and any page-route
+/// transition without waiting on an animation that never stops.
+Future<void> _settle(WidgetTester tester) async {
+  for (var i = 0; i < 40; i++) {
+    await tester.pump(const Duration(milliseconds: 16));
+  }
+}
+
 void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({});
@@ -73,7 +84,7 @@ void main() {
     // construction, before the (already-async) fetch's continuation
     // has had a chance to run.
     expect(find.text('Loading live status...'), findsOneWidget);
-    await tester.pumpAndSettle();
+    await _settle(tester);
   });
 
   testWidgets('renders status, delay, current location and next halt', (
@@ -104,12 +115,12 @@ void main() {
         repository,
       ),
     );
-    await tester.pumpAndSettle();
+    await _settle(tester);
 
-    expect(find.text('Running'), findsOneWidget);
+    expect(find.text('RUNNING'), findsOneWidget);
     expect(find.text('12 min late'), findsOneWidget);
     expect(find.textContaining('BRC'), findsOneWidget);
-    expect(find.text('83 km/h'), findsOneWidget);
+    expect(find.textContaining('83 km/h'), findsOneWidget);
     expect(find.textContaining('Ratlam'), findsOneWidget);
     expect(find.textContaining('10:30'), findsOneWidget);
   });
@@ -121,7 +132,7 @@ void main() {
     await tester.pumpWidget(
       _wrap(const LiveStatusScreen(trainNumber: '12951'), repository),
     );
-    await tester.pumpAndSettle();
+    await _settle(tester);
 
     expect(find.textContaining('late'), findsNothing);
     expect(find.textContaining('On time'), findsNothing);
@@ -145,7 +156,7 @@ void main() {
     await tester.pumpWidget(
       _wrap(const LiveStatusScreen(trainNumber: '12951'), repository),
     );
-    await tester.pumpAndSettle();
+    await _settle(tester);
 
     expect(find.textContaining('km/h'), findsNothing);
   });
@@ -162,7 +173,7 @@ void main() {
     await tester.pumpWidget(
       _wrap(const LiveStatusScreen(trainNumber: '99999'), repository),
     );
-    await tester.pumpAndSettle();
+    await _settle(tester);
 
     expect(
       find.text("Live status isn't available for this train."),
@@ -187,7 +198,7 @@ void main() {
     await tester.pumpWidget(
       _wrap(const LiveStatusScreen(trainNumber: '12951'), repository),
     );
-    await tester.pumpAndSettle();
+    await _settle(tester);
 
     expect(find.text('Diverted'), findsOneWidget);
     expect(find.text('Diverted via alternate route'), findsOneWidget);
@@ -214,11 +225,11 @@ void main() {
     );
 
     await tester.tap(find.text('open'));
-    await tester.pumpAndSettle();
+    await _settle(tester);
     expect(find.byType(LiveStatusScreen), findsOneWidget);
 
     await tester.tap(find.byTooltip('Back'));
-    await tester.pumpAndSettle();
+    await _settle(tester);
     expect(find.byType(LiveStatusScreen), findsNothing);
   });
 }

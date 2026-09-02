@@ -175,7 +175,7 @@ class _ResultsList extends StatelessWidget {
             SectionTitle(title: 'Running on ${DateFormatter.shortDate(date)}'),
             const SizedBox(height: AppSpacing.sm),
             for (final service in runningOnDate) ...[
-              TrainResultCard(service: service),
+              TrainResultCard(service: service, date: date),
               const SizedBox(height: AppSpacing.sm),
             ],
             const SizedBox(height: AppSpacing.md),
@@ -184,7 +184,7 @@ class _ResultsList extends StatelessWidget {
             const SectionTitle(title: 'Direct'),
           const SizedBox(height: AppSpacing.sm),
           for (final service in result.direct) ...[
-            TrainResultCard(service: service),
+            TrainResultCard(service: service, date: date),
             const SizedBox(height: AppSpacing.sm),
           ],
         ] else ...[
@@ -210,7 +210,7 @@ class _ResultsList extends StatelessWidget {
           const SectionTitle(title: '1 Change'),
           const SizedBox(height: AppSpacing.sm),
           for (final journey in result.connecting) ...[
-            ConnectingJourneyCard(journey: journey),
+            ConnectingJourneyCard(journey: journey, date: date),
             const SizedBox(height: AppSpacing.sm),
           ],
         ],

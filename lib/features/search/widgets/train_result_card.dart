@@ -14,9 +14,14 @@ import '../../train_details/train_details_screen.dart';
 /// derived from them. Never shows running days, fare, availability,
 /// platform or delay, none of which this dataset has.
 class TrainResultCard extends StatelessWidget {
-  const TrainResultCard({required this.service, super.key});
+  const TrainResultCard({required this.service, required this.date, super.key});
 
   final DirectService service;
+
+  /// The searched journey date - threaded straight to Train Details so
+  /// its automatic Live Status check asks about this exact date, never
+  /// "today" (Block 6 Live Status integration).
+  final DateTime date;
 
   @override
   Widget build(BuildContext context) {
@@ -36,7 +41,10 @@ class TrainResultCard extends StatelessWidget {
         padding: const EdgeInsets.all(AppSpacing.md),
         child: InkWell(
           onTap: () => Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => TrainDetailsScreen(train: train)),
+            MaterialPageRoute(
+              builder: (_) =>
+                  TrainDetailsScreen(train: train, journeyDate: date),
+            ),
           ),
           borderRadius: BorderRadius.circular(AppRadius.md),
           child: Column(
