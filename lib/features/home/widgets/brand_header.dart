@@ -25,7 +25,7 @@ class BrandHeader extends StatelessWidget {
                 ClipRRect(
                   borderRadius: BorderRadius.circular(AppRadius.sm),
                   child: Image.asset(
-                    'assets/icon.png',
+                    'assets/icon_display.png',
                     width: 44,
                     height: 44,
                     fit: BoxFit.cover,

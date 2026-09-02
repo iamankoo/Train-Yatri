@@ -2,7 +2,7 @@ name: train_yatri
 description: "Train Yatri - fast, simple Indian Railways companion"
 publish_to: 'none'
 
-version: 0.4.0+4
+version: 0.5.0+5
 
 environment:
   sdk: ^3.11.4
@@ -103,10 +103,25 @@ flutter:
   uses-material-design: true
 
   assets:
-    - assets/icon.png
+    - assets/icon_display.png
     - assets/splashscreen.png
-    - assets/mainpage.png
     - assets/database/railway.db
+    # assets/icon.png is the flutter_launcher_icons master (1254x1254 -
+    # sized for generating adaptive/Play Store launcher icons, read
+    # directly off disk by that dev-time tool per its own
+    # image_path: config below, independent of this bundled-assets
+    # list) - not what the running app displays, so deliberately NOT
+    # bundled itself. assets/icon_display.png is a 192x192 copy of the
+    # already-generated android/.../mipmap-xxxhdpi/ic_launcher.png
+    # (same source image, just the resolution the app's own 44dp
+    # BrandHeader icon actually needs) - reusing a file the launcher
+    # icon generator already produced, rather than bundling the much
+    # larger 1.2 MB master, saves real APK size against the 55 MB hard
+    # limit (Block 5, Part 38) for a display nobody can tell apart.
+    #
+    # assets/mainpage.png and assets/top.png are design references only
+    # (cited in code doc comments for provenance) - never loaded via
+    # Image.asset at runtime, so also deliberately not bundled.
 
 flutter_launcher_icons:
   android: true
