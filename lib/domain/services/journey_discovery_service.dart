@@ -64,6 +64,16 @@ abstract final class JourneyDiscoveryService {
     required int toStationId,
     JourneyDiscoveryConfig config = JourneyDiscoveryConfig.defaults,
   }) async {
+    // Block 5, "Same station": never run a journey search for FROM ==
+    // TO. The UI already refuses to start one (JourneySearchState.isValid),
+    // but this guards the service directly too - without it, a
+    // "go out on one train, come back on a different one" combination
+    // could otherwise surface as a nonsensical "connection" from a
+    // station to itself.
+    if (fromStationId == toStationId) {
+      return const JourneyDiscoveryResult(direct: [], connecting: []);
+    }
+
     final direct = await repository.findDirectServices(
       fromStationId: fromStationId,
       toStationId: toStationId,

@@ -175,4 +175,48 @@ void main() {
       expect(find.textContaining('98001T'), findsOneWidget);
     },
   );
+
+  testWidgets('exposes semantic labels for the connecting journey\'s legs, the '
+      'change-at row, and the total duration (Block 5 accessibility)', (
+    tester,
+  ) async {
+    final from = await _lookupStation('WA');
+    final to = await _lookupStation('WB');
+
+    await tester.pumpWidget(
+      _wrap(
+        SearchResultsScreen(from: from, to: to, date: DateTime(2026, 9, 2)),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final semantics = tester.getSemantics(find.byType(Scaffold).first);
+    final semanticsTree = semantics.toStringDeep();
+    expect(semanticsTree, contains('97002T'));
+    expect(semanticsTree, contains('Change at Both Interchange'));
+    expect(semanticsTree, contains('Wait 40 min'));
+    expect(semanticsTree, contains('Total journey time'));
+  });
+
+  for (final width in [320.0, 360.0, 390.0, 412.0]) {
+    testWidgets('the connecting-journey card lays out without horizontal '
+        'overflow at ${width}dp width', (tester) async {
+      tester.view.physicalSize = Size(width, 2000);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final from = await _lookupStation('WA');
+      final to = await _lookupStation('WB');
+
+      await tester.pumpWidget(
+        _wrap(
+          SearchResultsScreen(from: from, to: to, date: DateTime(2026, 9, 2)),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+    });
+  }
 }

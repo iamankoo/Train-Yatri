@@ -165,6 +165,65 @@ void main() {
     expect(rows.map((r) => r['number']), contains('90000'));
   });
 
+  test('findDepartures\' query shape (Block 5 connecting-journey candidate '
+      'generation) uses idx_route_stops_station, not a full scan', () async {
+    final plan = await db.rawQuery('''
+        EXPLAIN QUERY PLAN
+        SELECT * FROM route_stops
+        WHERE station_id = 1 AND departure_time IS NOT NULL
+        ORDER BY day_offset, departure_time
+      ''');
+    final text = plan.map((r) => r.values.join(' ')).join('\n').toUpperCase();
+    expect(text, contains('IDX_ROUTE_STOPS_STATION'));
+    expect(text, isNot(contains('SCAN ROUTE_STOPS')));
+  });
+
+  test('a full connecting-journey search (Block 5 JourneyDiscoveryService\' '
+      'shape: one findDepartures + a getRouteWithStations per candidate + '
+      'one findDirectServices per candidate interchange) stays fast at '
+      'this scale - a realistic upper bound for interactive search, not '
+      'an in-memory graph search', () async {
+    final stopwatch = Stopwatch()..start();
+    // Mirrors JourneyDiscoveryService's default bounds: up to 8
+    // first-leg candidates, up to 25 interchange candidates overall,
+    // each triggering one bounded findDirectServices-shaped query.
+    final departures = await db.query(
+      'route_stops',
+      where: 'station_id = 1 AND departure_time IS NOT NULL',
+      orderBy: 'day_offset, departure_time',
+      limit: 8,
+    );
+    var interchangeBudget = 25;
+    for (final departure in departures) {
+      if (interchangeBudget <= 0) break;
+      final route = await db.query(
+        'route_stops',
+        where: 'train_id = ?',
+        whereArgs: [departure['train_id']],
+        orderBy: 'stop_sequence',
+      );
+      for (final stop in route) {
+        if (interchangeBudget <= 0) break;
+        interchangeBudget--;
+        await db.rawQuery(
+          '''
+            SELECT t.* FROM route_stops rs_from
+            JOIN route_stops rs_to
+              ON rs_to.train_id = rs_from.train_id
+              AND rs_to.station_id = 5
+              AND rs_to.stop_sequence > rs_from.stop_sequence
+            JOIN trains t ON t.train_id = rs_from.train_id
+            WHERE rs_from.station_id = ?
+            LIMIT 5
+            ''',
+          [stop['station_id']],
+        );
+      }
+    }
+    stopwatch.stop();
+    expect(stopwatch.elapsedMilliseconds, lessThan(3000));
+  });
+
   test('indexed queries stay fast at this scale', () async {
     final stopwatch = Stopwatch()..start();
     for (var i = 0; i < 50; i++) {

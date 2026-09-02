@@ -15,43 +15,48 @@ class BrandHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(AppRadius.sm),
-              child: Image.asset(
-                'assets/icon.png',
-                width: 44,
-                height: 44,
-                fit: BoxFit.cover,
-              ),
-            ),
-            const SizedBox(width: AppSpacing.sm),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  RichText(
-                    text: const TextSpan(
-                      style: AppTextStyles.brandWordmark,
-                      children: [
-                        TextSpan(text: 'Train '),
-                        TextSpan(
-                          text: 'Yatri',
-                          style: TextStyle(color: AppColors.primary),
-                        ),
-                      ],
+        Center(
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(AppRadius.sm),
+                  child: Image.asset(
+                    'assets/icon.png',
+                    width: 44,
+                    height: 44,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    RichText(
+                      text: const TextSpan(
+                        style: AppTextStyles.brandWordmark,
+                        children: [
+                          TextSpan(text: 'Train '),
+                          TextSpan(
+                            text: 'Yatri',
+                            style: TextStyle(color: AppColors.primary),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  const Text(
-                    'Your journey. Our track.',
-                    style: AppTextStyles.tagline,
-                  ),
-                ],
-              ),
+                    const Text(
+                      'Your journey. Our track.',
+                      style: AppTextStyles.tagline,
+                    ),
+                  ],
+                ),
+              ],
             ),
-          ],
+          ),
         ),
         const SizedBox(height: AppSpacing.sm),
         Row(
