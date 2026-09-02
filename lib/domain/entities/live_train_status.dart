@@ -134,6 +134,7 @@ final class LiveRouteStop {
     required this.sequence,
     required this.stationCode,
     required this.stationName,
+    required this.isHalt,
     required this.scheduledArrival,
     required this.scheduledDeparture,
     required this.actualArrival,
@@ -148,6 +149,14 @@ final class LiveRouteStop {
   final int? sequence;
   final String? stationCode;
   final String? stationName;
+
+  /// Whether this route entry is a real, scheduled stoppage - the
+  /// train actually halts here - as opposed to a pass-through point
+  /// the route travels via without stopping. A real field RailRadar's
+  /// live route reports per stop; `null` when the provider didn't say,
+  /// never guessed as true or false.
+  final bool? isHalt;
+
   final DateTime? scheduledArrival;
   final DateTime? scheduledDeparture;
   final DateTime? actualArrival;

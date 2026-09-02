@@ -62,6 +62,14 @@ function normalizeRouteStop(raw) {
     sequence: numberOrNull(raw.sequence),
     stationCode: stringOrNull(raw.stationCode),
     stationName: stringOrNull(raw.stationName),
+    // Whether this route entry is a real, scheduled stoppage (the
+    // train actually halts here) as opposed to a pass-through point
+    // the route just travels via - a real field RailRadar's live
+    // route array reports per stop (verified directly against the
+    // live API), distinct from `currentLocation.isHalt` (which
+    // describes the train's own moment-to-moment position, not this
+    // stop's static role in the route).
+    isHalt: boolOrNull(raw.isHalt),
     scheduledArrival: stringOrNull(raw.scheduledArrival),
     scheduledDeparture: stringOrNull(raw.scheduledDeparture),
     actualArrival: stringOrNull(raw.actualArrival),

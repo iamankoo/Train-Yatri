@@ -157,6 +157,7 @@ LiveRouteStop _parseRouteStop(Map<String, dynamic> json) {
     sequence: (json['sequence'] as num?)?.toInt(),
     stationCode: json['stationCode'] as String?,
     stationName: json['stationName'] as String?,
+    isHalt: json['isHalt'] as bool?,
     scheduledArrival: _parseDateTime(json['scheduledArrival']),
     scheduledDeparture: _parseDateTime(json['scheduledDeparture']),
     actualArrival: _parseDateTime(json['actualArrival']),

@@ -63,6 +63,7 @@ class LiveStatusBody extends StatelessWidget {
                   LiveRouteTimeline(
                     route: status.route,
                     currentLocation: status.currentLocation,
+                    delayMinutes: status.delayMinutes,
                     previousHalt: status.previousHalt,
                     nextHalt: status.nextHalt,
                   ),

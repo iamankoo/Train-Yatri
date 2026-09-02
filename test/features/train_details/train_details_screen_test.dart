@@ -91,10 +91,16 @@ LiveTrainStatus _liveStatus({
   exceptions: exceptions,
 );
 
-LiveRouteStop _stop(int sequence, String code, String name) => LiveRouteStop(
+LiveRouteStop _stop(
+  int sequence,
+  String code,
+  String name, {
+  bool? isHalt = true,
+}) => LiveRouteStop(
   sequence: sequence,
   stationCode: code,
   stationName: name,
+  isHalt: isHalt,
   scheduledArrival: null,
   scheduledDeparture: null,
   actualArrival: null,
@@ -301,7 +307,10 @@ void main() {
       await _settle(tester);
 
       expect(find.text('RUNNING'), findsOneWidget);
-      expect(find.text('12 min late'), findsOneWidget);
+      // Shown twice by design: once in the top header, once attached
+      // to the current live position in the route timeline - the
+      // same real delayMinutes, never a second calculation.
+      expect(find.text('12 min late'), findsNWidgets(2));
       expect(liveStatus.callCount, 1);
     });
 

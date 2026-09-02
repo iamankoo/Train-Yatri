@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -51,4 +52,28 @@ void main() {
       await tester.pumpAndSettle();
     }
   });
+
+  test(
+    'icon.png is square (the launcher-icon master must not be distorted)',
+    () async {
+      // assets/icon.png is generated from a non-square source
+      // (352x332) by uniformly scaling to a square - if a future
+      // replacement source were dropped in without that scaling step,
+      // flutter_launcher_icons would silently stretch it across every
+      // Android/iOS density. Decoding the real file and comparing its
+      // actual width/height is the only way to catch that; a
+      // find-and-decode-through-Image.asset check (as above) wouldn't,
+      // since icon.png isn't a bundled asset in the first place.
+      final bytes = await File('assets/icon.png').readAsBytes();
+      final codec = await ui.instantiateImageCodec(bytes);
+      final frame = await codec.getNextFrame();
+      expect(
+        frame.image.width,
+        frame.image.height,
+        reason:
+            'assets/icon.png must be square to avoid distortion when '
+            'flutter_launcher_icons generates Android/iOS launcher icons',
+      );
+    },
+  );
 }

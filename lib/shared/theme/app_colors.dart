@@ -34,4 +34,10 @@ abstract final class AppColors {
   static const Color success = Color(0xFF16A34A);
   static const Color warning = Color(0xFFD97706);
   static const Color error = Color(0xFFDC2626);
+
+  /// A genuine, distinct yellow - used only for a future train
+  /// stoppage in the Live Status route timeline (Block 6). Distinct
+  /// from [warning] (an amber/orange already used for unrelated "+1
+  /// day" badges) so the two don't read as the same signal.
+  static const Color amber = Color(0xFFEAB308);
 }

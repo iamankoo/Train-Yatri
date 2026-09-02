@@ -42,6 +42,7 @@ function fullRawResponse(overrides = {}) {
         sequence: 1,
         stationCode: 'BCT',
         stationName: 'MUMBAI CENTRAL',
+        isHalt: true,
         scheduledArrival: null,
         scheduledDeparture: '2026-09-02T17:00:00Z',
         actualArrival: null,
@@ -51,6 +52,21 @@ function fullRawResponse(overrides = {}) {
         status: 'departed',
         distance: 0,
         platform: '1',
+      },
+      {
+        sequence: 2,
+        stationCode: 'MX',
+        stationName: 'MUMBAI MAHALAKSHMI',
+        isHalt: false,
+        scheduledArrival: '2026-09-02T17:01:00Z',
+        scheduledDeparture: '2026-09-02T17:01:00Z',
+        actualArrival: null,
+        actualDeparture: null,
+        delayArrival: null,
+        delayDeparture: null,
+        status: 'upcoming',
+        distance: 1.5,
+        platform: null,
       },
     ],
     exceptions: [],
@@ -72,6 +88,35 @@ test('normalizes a full, realistic response end to end', () => {
   assert.equal(result.currentLocation.segmentProgress, 0.35);
   assert.equal(result.nextHalt.stationName, 'RATLAM JN');
   assert.equal(result.route[0].platform, '1');
+});
+
+test('each route stop reports its real isHalt flag - a genuine stoppage is '
+  + 'distinguishable from a pass-through point in the same route', () => {
+  const result = normalizeLiveStatus(fullRawResponse());
+
+  assert.equal(result.route[0].stationCode, 'BCT');
+  assert.equal(result.route[0].isHalt, true);
+
+  assert.equal(result.route[1].stationCode, 'MX');
+  assert.equal(result.route[1].isHalt, false);
+});
+
+test('a route stop with isHalt missing/malformed normalizes to null, never '
+  + 'guessed as true or false', () => {
+  const result = normalizeLiveStatus(
+    fullRawResponse({
+      route: [
+        {
+          sequence: 1,
+          stationCode: 'BCT',
+          stationName: 'MUMBAI CENTRAL',
+          isHalt: undefined,
+          status: 'departed',
+        },
+      ],
+    }),
+  );
+  assert.equal(result.route[0].isHalt, null);
 });
 
 test('returns null for a completely missing/malformed response, never throws', () => {
