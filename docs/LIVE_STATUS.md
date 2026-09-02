@@ -127,9 +127,22 @@ via `rootDir`) is a Render Blueprint: a public Web Service,
 `rootDir: backend`, `healthCheckPath: /healthz`, and
 `RAILRADAR_API_KEY` declared with `sync: false` (Render prompts for the
 real value in its dashboard - the key is never in this repository).
-Connecting this repository to Render and setting the real key is a
-manual, one-time step on the account that owns the RailRadar key; this
-document does not (and cannot) perform that step.
+
+**Deployed** at <https://train-yatri-backend.onrender.com> (Render
+free tier, connected to this repository's `main` branch - a push to
+`main` triggers a new build automatically). The real key was entered
+once, directly into the Render dashboard's Environment tab, by the
+account owner - it was never typed by Claude and never passed through
+chat. `lib/core/config/env.dart`'s `Env.apiBaseUrl` defaults to this
+URL for all three environments, since only one backend is actually
+provisioned right now; separate staging/production Render services
+would be a later infrastructure decision, not something to fake with
+placeholder domains that don't resolve.
+
+Free-tier caveat: the instance spins down after a period of
+inactivity, which can delay the *first* request after a gap by 50+
+seconds while it restarts - subsequent requests are normal speed. This
+is a Render free-tier characteristic, not a bug in this backend.
 
 ## Flutter
 
@@ -237,3 +250,8 @@ gitignored `backend/.env`):
   requests/minute, 1000/month) - see `docs/RUNNING_DAYS_BACKFILL.md`
   for how a second, unrelated feature was deliberately designed to
   never compete with Live Status for that budget.
+- The backend runs on Render's free tier, which spins the instance
+  down after inactivity - the first request after a gap can take 50+
+  seconds while it restarts. The `LiveStatusUnavailable`/timeout UI
+  states handle this gracefully (a clear message, not a crash or a
+  hang), but there is currently no "warming" mechanism to avoid it.

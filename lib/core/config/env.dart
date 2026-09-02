@@ -35,10 +35,17 @@ abstract final class Env {
       ? AppEnvironment.staging
       : AppEnvironment.development;
 
+  /// Only one backend is actually deployed right now (Render's free
+  /// tier - see `render.yaml` and `docs/LIVE_STATUS.md` "Deployment"):
+  /// https://train-yatri-backend.onrender.com. All three environments
+  /// point at it until separate staging/production Render services
+  /// are actually provisioned - that's a real infrastructure decision
+  /// for later, not something to fake with placeholder domains that
+  /// don't resolve to anything.
   static const _environmentDefaultUrls = {
-    AppEnvironment.development: 'https://dev-api.trainyatri.app',
-    AppEnvironment.staging: 'https://staging-api.trainyatri.app',
-    AppEnvironment.production: 'https://api.trainyatri.app',
+    AppEnvironment.development: 'https://train-yatri-backend.onrender.com',
+    AppEnvironment.staging: 'https://train-yatri-backend.onrender.com',
+    AppEnvironment.production: 'https://train-yatri-backend.onrender.com',
   };
 
   /// Overridable independently of [current] with:
