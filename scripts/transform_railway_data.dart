@@ -31,6 +31,16 @@
 //    stations in India" (CC BY-SA 4.0) is checked as a second,
 //    strictly-fallback source by station code - only ever fills a gap,
 //    never overrides a state either earlier source already provided.
+//  - For a station still missing a state after that, Block 4's
+//    data/enrichment/station_states.csv (see
+//    scripts/enrich_station_states.dart) is checked as a third,
+//    strictly-fallback source - a station-code -> state table computed
+//    geometrically (point-in-polygon against official state/UT
+//    boundaries), likewise only ever filling a gap.
+//  - Every state value from any source is passed through
+//    scripts/state_names.dart's canonicalizeStateName() - an
+//    unrecognized value is dropped (logged, never stored) rather than
+//    risk storing a typo or a stale name as if it were current.
 //    A station with no state in any source keeps `state: null` - not
 //    guessed.
 //  - running_days.csv is written with a header only, no rows: neither
@@ -42,6 +52,8 @@ import 'dart:io';
 
 import 'package:csv/csv.dart';
 import 'package:train_yatri/domain/services/railway_normalization.dart';
+
+import 'state_names.dart';
 
 class _StationRecord {
   _StationRecord(this.code, this.name);
@@ -224,8 +236,16 @@ Future<void> main(List<String> arguments) async {
     // datameet leaves `state` as "" (not absent) on roughly half its
     // entries - only take it when it actually has a value, so an empty
     // string here never overwrites/blocks a later fallback source.
-    final state = props['state'] as String?;
-    if (state != null && state.isNotEmpty) {
+    final rawState = props['state'] as String?;
+    final state = rawState == null || rawState.isEmpty
+        ? null
+        : canonicalizeStateName(rawState);
+    if (rawState != null && rawState.isNotEmpty && state == null) {
+      stdout.writeln(
+        '  datameet: unrecognized state "$rawState" for $code - dropped, not stored.',
+      );
+    }
+    if (state != null) {
       record.state = state;
       stateFromDatameet++;
     }
@@ -254,24 +274,78 @@ Future<void> main(List<String> arguments) async {
     for (final record in stationsByCode.values) {
       if (record.state != null) continue; // datameet already had it
       final normalizedCode = RailwayNormalization.normalizeCode(record.code);
-      final state = wikiStateByCode[normalizedCode];
-      if (state != null) {
-        record.state = state;
-        stateFromWikipedia++;
+      final rawState = wikiStateByCode[normalizedCode];
+      if (rawState == null) continue;
+      final state = canonicalizeStateName(rawState);
+      if (state == null) {
+        stdout.writeln(
+          '  Wikipedia: unrecognized state "$rawState" for $normalizedCode - dropped, not stored.',
+        );
+        continue;
       }
+      record.state = state;
+      stateFromWikipedia++;
+    }
+    stdout.writeln(
+      'Wikipedia: $stateFromWikipedia additional stations got a state '
+      '(${wikiStateByCode.length} station-code -> state pairs parsed).',
+    );
+  } else {
+    stdout.writeln(
+      '${wikipediaFile.path} not found - skipping Wikipedia state fallback.',
+    );
+  }
+
+  // --- Source 4: geometric enrichment (Block 4) ---
+  // data/enrichment/station_states.csv (see
+  // scripts/enrich_station_states.dart for how it's generated) - a
+  // station-code -> state table computed by point-in-polygon against
+  // official state/UT boundaries, using coordinates datameet already
+  // supplied above. Applied last, strictly as a gap-filler: only ever
+  // fills a station that still has no state after sources 1-3, never
+  // overrides one.
+  final enrichmentFile = File('data/enrichment/station_states.csv');
+  if (enrichmentFile.existsSync()) {
+    stdout.writeln('Reading ${enrichmentFile.path} ...');
+    final enrichmentRows = const CsvToListConverter(
+      eol: '\n',
+    ).convert(enrichmentFile.readAsStringSync(), eol: '\n');
+    final enrichedStateByCode = <String, String>{};
+    for (final row in enrichmentRows.skip(1)) {
+      if (row.length < 2) continue;
+      final code = RailwayNormalization.normalizeCode(row[0].toString());
+      final state = row[1].toString();
+      enrichedStateByCode.putIfAbsent(code, () => state);
+    }
+    var stateFromEnrichment = 0;
+    for (final record in stationsByCode.values) {
+      if (record.state != null) continue; // sources 1-3 already had it
+      final normalizedCode = RailwayNormalization.normalizeCode(record.code);
+      final rawState = enrichedStateByCode[normalizedCode];
+      if (rawState == null) continue;
+      final state = canonicalizeStateName(rawState);
+      if (state == null) {
+        stdout.writeln(
+          '  enrichment: unrecognized state "$rawState" for $normalizedCode - dropped, not stored.',
+        );
+        continue;
+      }
+      record.state = state;
+      stateFromEnrichment++;
     }
     final stillMissing = stationsByCode.values
         .where((r) => r.state == null)
         .length;
     stdout.writeln(
-      'Wikipedia: $stateFromWikipedia additional stations got a state '
-      '(${wikiStateByCode.length} station-code -> state pairs parsed). '
-      '$stillMissing / ${stationsByCode.length} stations still have no '
-      'state from any source - left as null, not guessed.',
+      'Geometric enrichment: $stateFromEnrichment additional stations got '
+      'a state (${enrichedStateByCode.length} station-code -> state pairs '
+      'available). $stillMissing / ${stationsByCode.length} stations '
+      'still have no state from any source - left as null, not guessed.',
     );
   } else {
     stdout.writeln(
-      '${wikipediaFile.path} not found - skipping Wikipedia state fallback.',
+      '${enrichmentFile.path} not found - skipping geometric state '
+      'enrichment (run scripts/enrich_station_states.dart first).',
     );
   }
 
