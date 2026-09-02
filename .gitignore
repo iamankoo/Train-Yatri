@@ -33,6 +33,10 @@ migrate_working_dir/
 /build/
 /coverage/
 
+# Local scratch area for staging release APKs/checksums before
+# uploading to a GitHub Release - never committed, see docs/APK_UPDATE_SYSTEM.md.
+/release_staging/
+
 # Symbolication related
 app.*.symbols
 

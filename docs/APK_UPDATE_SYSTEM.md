@@ -198,6 +198,21 @@ different asset, never more than one per install.
 - `test/features/profile/profile_screen_test.dart`: the manual check's
   three outcomes, plus no-overflow at 320/360/390/412dp.
 
+## `pubspec.yaml`'s `version:` must actually be bumped every release
+
+The update check's "installed version" comes from `package_info_plus`,
+which reads the real installed APK's `versionName` - Android derives
+that from `pubspec.yaml`'s own `version:` field at build time
+(`flutter.versionName`). **Discovered while building this block:**
+`pubspec.yaml` had stayed at `0.2.0+2` through the v0.3.0 release (its
+own git tag/GitHub Release bumped; the pubspec field silently didn't) -
+had that shipped, a v0.3.0 install would have reported itself as
+`0.2.0` to this very update check, permanently seeing every future
+release as "already installed" and never offering an update at all.
+Bumped to `0.4.0+4` for this release; **every future release must bump
+this field to match its own tag**, or the whole update system silently
+stops working for whoever installed the mismatched version.
+
 ## Known limitations
 
 - The release APK is signed with the debug keystore (see
